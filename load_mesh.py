@@ -3,7 +3,7 @@ import pickle
 import matplotlib.pyplot as plt
 # from pathos.multiprocessing import ProcessingPool as Pool
 
-dt = 2e-1
+dt = 2e-4
 timesteps = 50
 # timesteps = 1
 
@@ -11,31 +11,40 @@ timesteps = 50
 # load Mesh
 Mesh = pickle.load( open( "data/Meshdump.pkl", "rb" ) )
 total_nodes = len(Mesh.pos)
-Mesh.disp = Mesh.vel = Mesh.acc = Mesh.extforce =  np.zeros((total_nodes,3))
-Mesh.CurrPos = Mesh.force =  np.zeros((total_nodes,3))
+Mesh.disp =  np.zeros((total_nodes,3))
+Mesh.vel =  np.zeros((total_nodes,3))
+Mesh.acc =  np.zeros((total_nodes,3))
+Mesh.extforce =  np.zeros((total_nodes,3))
+Mesh.CurrPos = np.zeros((total_nodes,3))
+Mesh.force =  np.zeros((total_nodes,3))
 
 bottom_node = np.argmin(Mesh.pos[:,2])  
 top_node = np.argmax(Mesh.pos[:,2])  
 print('bottom node', bottom_node)
 
 # nodes to clamp
-# clamped_nodes = []
-clamped_nodes = [bottom_node]
+clamped_nodes = []
+# clamped_nodes = [bottom_node]
 
 # Material properties
 
-E = 72e9
+# E = 72e9
+E = 0.3e9 # Polyethylene (low density) LDPE 
 nu = 1/3
 cnot = 6*E/( np.pi * (Mesh.delta**3) * (1 - nu))
 
 # division between 1e8:too stiff and 1e10:too loose
-Mesh.cnot = cnot / 1e8
+Mesh.cnot = cnot
+# Mesh.cnot = cnot /1e6
 print('cnot', cnot)
-Mesh.rho = 1000
+
+thickness = 50e-6 # 0.05 mm
+Mesh.rho = 920 # LDPE 920 kg/m^3
+# Mesh.rho = 920 * thickness # LDPE 920 kg/m^3
 
 ## pressure properties
 # gravity
-g_val = -1e-7
+g_val = -10
 Mesh.pnot = 1
 Mesh.b = 10
 
@@ -72,12 +81,12 @@ for i in range(len(Mesh.Conn)):
 # Mesh.disp += [0, 0, 0.5]
 # Mesh.disp[top_node] += [0, 0, 0.5]
 # Mesh.vel += [0, 0, 1]
-# Mesh.vel[top_node] += [0, 0, 0.1]
+Mesh.vel[top_node] += [0, 0, 1e2]
 # Mesh.acc += [0, 0, 0]
 # Mesh.acc[top_node] += [0, 0, 1e5]
 # Mesh.extforce += [0, 0, 0]
 ## gravity density
-Mesh.extforce += [0, 0, g_val *Mesh.rho]
+# Mesh.extforce += [0, 0, g_val *Mesh.rho]
 # Mesh.extforce[top_node] += [0, 0, 1]
 
 def get_peridynamic_force(Mesh):
@@ -141,7 +150,8 @@ def get_pressure(Mesh):
 
     """
     area = np.zeros((total_nodes, 1))
-    unormal = pforce = np.zeros((total_nodes, 3))
+    unormal = np.zeros((total_nodes, 3))
+    pforce = np.zeros((total_nodes, 3))
 
     T = Mesh.T
     Pos = Mesh.CurrPos
@@ -200,13 +210,22 @@ print('top node neighbors', top_nbr)
 bottom_nbr = Mesh.NArr[bottom_node]
 print('bottom node neighbors', bottom_nbr)
 
+# print('Initial mean disp', np.mean(Mesh.disp, axis = 0))
+
 plotcounter = 1
 for t in range(timesteps):
     print('t', t)
 
+    # print('mean CurrPos', np.mean(Mesh.CurrPos, axis = 0))
+    # print('mean disp', np.mean(Mesh.disp, axis = 0))
+    # print('mean vel', np.mean(Mesh.vel, axis = 0))
+
     # initial update
     Mesh.disp += dt * Mesh.vel + (dt * dt * 0.5) * Mesh.acc
     Mesh.CurrPos = Mesh.pos + Mesh.disp
+
+    # print('after mean CurrPos', np.mean(Mesh.CurrPos, axis = 0))
+    # print('after mean disp', np.mean(Mesh.disp, axis = 0))
 
     ## compute force
     Mesh.force = get_peridynamic_force(Mesh)
@@ -214,9 +233,9 @@ for t in range(timesteps):
     # print(force[top_node,:])
     # print(force[top_nbr,:])
     # print(force[bottom_nbr,:])
-    # force += get_pressure(Mesh)
-    P = get_pressure(Mesh)
-    Mesh.force += P.pforce
+
+    # P = get_pressure(Mesh)
+    # Mesh.force += P.pforce
     # print(P.CurrNormal)
 
     # final update
