@@ -141,5 +141,7 @@ dmypy.json
 /.vim
 img/*
 !img/.gitkeep
+savedata/*
+!savedata/.gitkeep
 
 
