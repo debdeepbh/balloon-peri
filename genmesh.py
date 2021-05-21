@@ -1,6 +1,7 @@
 import pygmsh
 import numpy as np
 import matplotlib.pyplot as plt
+import pickle
 
 # import optimesh
 
@@ -44,6 +45,22 @@ class ReturnValue(object):
         # pressure properties
         self.pnot = None
         self.b = None
+
+        # other
+        self.clamped_nodes = []
+        self.top_node = None
+        self.bottom_node = None
+
+        # plot related
+        self.plotcounter = 1
+
+    def save_state(self, filename):
+        """Save Mesh with current values to disk using pickle
+        :filename: TODO
+        :returns: TODO
+        """
+        with open(filename, 'wb') as file_h:
+          pickle.dump(self, file_h)
 
     def get_edges(self):
         """returns all the edges connecting various nodes

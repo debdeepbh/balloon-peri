@@ -4,91 +4,99 @@ import matplotlib.pyplot as plt
 # from pathos.multiprocessing import ProcessingPool as Pool
 
 dt = 2e-2
-timesteps = 2000
+timesteps = 50000
 # timesteps = 1
 
-
-# load Mesh
-Mesh = pickle.load( open( "data/Meshdump.pkl", "rb" ) )
-total_nodes = len(Mesh.pos)
-Mesh.disp =  np.zeros((total_nodes,3))
-Mesh.vel =  np.zeros((total_nodes,3))
-Mesh.acc =  np.zeros((total_nodes,3))
-Mesh.extforce =  np.zeros((total_nodes,3))
-Mesh.CurrPos = np.zeros((total_nodes,3))
-Mesh.force =  np.zeros((total_nodes,3))
-
-bottom_node = np.argmin(Mesh.pos[:,2])  
-top_node = np.argmax(Mesh.pos[:,2])  
-print('bottom node', bottom_node)
-
-# nodes to clamp
-# clamped_nodes = []
-clamped_nodes = [bottom_node]
-
-# Material properties
-
-# E = 72e9
-E = 0.3e9 # Polyethylene (low density) LDPE 
-nu = 1/3
-cnot = 6*E/( np.pi * (Mesh.delta**3) * (1 - nu))
-
-# division between 1e8:too stiff and 1e10:too loose
-Mesh.cnot = cnot
-Mesh.cnot = cnot /1e3
-print('cnot', cnot)
-
-thickness = 50e-6 # 0.05 mm
-Mesh.rho = 920 # LDPE 920 kg/m^3
-# Mesh.rho = 920 * thickness # LDPE 920 kg/m^3
-
-## pressure properties
-# gravity
-g_val = -10
-Mesh.pnot = 100
-Mesh.b = 500
+resume = True
+# resume = False
 
 # plot properties
-modulo = 10
+modulo = 50
 box_L = 1.5
 # print('dim, cam angle', dim,  camera_angle)
 camera_angle = [0, 0]
 dotsize = 2
 
-## Connectivity to NbdArr
-Mesh.NArr = []
-# Mesh.xi = []
-Mesh.xi_norm = []
-for i in range(len(Mesh.pos)):
-    Mesh.NArr.append([])
-    Mesh.xi_norm.append([])
 
-for i in range(len(Mesh.Conn)):
-    v = Mesh.Conn[i]
-    p = v[0]
-    q = v[1]
-    d = Mesh.Conn_xi_norm[i]
-    Mesh.NArr[p].append(q)
-    Mesh.NArr[q].append(p)
+if resume:
+    # load Mesh
+    Mesh = pickle.load( open( "savedata/Mesh_saved.pkl", "rb" ) )
+    total_nodes = len(Mesh.pos)
+else:
+    # load Mesh
+    Mesh = pickle.load( open( "data/Meshdump.pkl", "rb" ) )
+    total_nodes = len(Mesh.pos)
+    Mesh.disp =  np.zeros((total_nodes,3))
+    Mesh.vel =  np.zeros((total_nodes,3))
+    Mesh.acc =  np.zeros((total_nodes,3))
+    Mesh.extforce =  np.zeros((total_nodes,3))
+    Mesh.CurrPos = np.zeros((total_nodes,3))
+    Mesh.force =  np.zeros((total_nodes,3))
 
-    Mesh.xi_norm[p].append(d)
-    Mesh.xi_norm[q].append(d)
+    Mesh.bottom_node = np.argmin(Mesh.pos[:,2])  
+    Mesh.top_node = np.argmax(Mesh.pos[:,2])  
+    print('bottom node', Mesh.bottom_node)
 
-# print(Mesh.NArr)
-# print(Mesh.xi_norm)
+    # nodes to clamp
+    # clamped_nodes = []
+    Mesh.clamped_nodes = [Mesh.bottom_node]
 
-## Initial data
-# Mesh.disp += [0, 0, 0]
-# Mesh.disp += [0, 0, 0.5]
-# Mesh.disp[top_node] += [0, 0, 0.5]
-# Mesh.vel += [0, 0, 1]
-# Mesh.vel[top_node] += [0, 0, 1e2]
-# Mesh.acc += [0, 0, 0]
-# Mesh.acc[top_node] += [0, 0, 1e5]
-# Mesh.extforce += [0, 0, 0]
-## gravity density
-# Mesh.extforce += [0, 0, g_val *Mesh.rho]
-# Mesh.extforce[top_node] += [0, 0, 1]
+    # Material properties
+
+    # E = 72e9
+    E = 0.3e9 # Polyethylene (low density) LDPE 
+    nu = 1/3
+    cnot = 6*E/( np.pi * (Mesh.delta**3) * (1 - nu))
+
+    # division between 1e8:too stiff and 1e10:too loose
+    Mesh.cnot = cnot
+    Mesh.cnot = cnot /1e3
+    print('cnot', cnot)
+
+    thickness = 50e-6 # 0.05 mm
+    Mesh.rho = 920 # LDPE 920 kg/m^3
+    # Mesh.rho = 920 * thickness # LDPE 920 kg/m^3
+
+    ## pressure properties
+    # gravity
+    g_val = -10
+    Mesh.pnot = 100
+    Mesh.b = 500
+
+    ## Connectivity to NbdArr
+    Mesh.NArr = []
+    # Mesh.xi = []
+    Mesh.xi_norm = []
+    for i in range(len(Mesh.pos)):
+        Mesh.NArr.append([])
+        Mesh.xi_norm.append([])
+
+    for i in range(len(Mesh.Conn)):
+        v = Mesh.Conn[i]
+        p = v[0]
+        q = v[1]
+        d = Mesh.Conn_xi_norm[i]
+        Mesh.NArr[p].append(q)
+        Mesh.NArr[q].append(p)
+
+        Mesh.xi_norm[p].append(d)
+        Mesh.xi_norm[q].append(d)
+
+    # print(Mesh.NArr)
+    # print(Mesh.xi_norm)
+
+    ## Initial data
+    # Mesh.disp += [0, 0, 0]
+    # Mesh.disp += [0, 0, 0.5]
+    # Mesh.disp[Mesh.top_node] += [0, 0, 0.5]
+    # Mesh.vel += [0, 0, 1]
+    # Mesh.vel[Mesh.top_node] += [0, 0, 1e2]
+    # Mesh.acc += [0, 0, 0]
+    # Mesh.acc[Mesh.top_node] += [0, 0, 1e5]
+    # Mesh.extforce += [0, 0, 0]
+    ## gravity density
+    # Mesh.extforce += [0, 0, g_val *Mesh.rho]
+    # Mesh.extforce[Mesh.top_node] += [0, 0, 1]
 
 def get_peridynamic_force(Mesh):
     """Compute the peridynamic force
@@ -204,14 +212,13 @@ def get_pressure(Mesh):
 
     return PressureQ(pforce, CurrArea=area, CurrNormal=unormal)
 
-top_nbr = Mesh.NArr[top_node]
+top_nbr = Mesh.NArr[Mesh.top_node]
 print('top node neighbors', top_nbr)
-bottom_nbr = Mesh.NArr[bottom_node]
+bottom_nbr = Mesh.NArr[Mesh.bottom_node]
 print('bottom node neighbors', bottom_nbr)
 
 # print('Initial mean disp', np.mean(Mesh.disp, axis = 0))
 
-plotcounter = 1
 for t in range(timesteps):
     # print('t', t)
 
@@ -229,7 +236,7 @@ for t in range(timesteps):
     ## compute force
     Mesh.force = get_peridynamic_force(Mesh)
 
-    # print(force[top_node,:])
+    # print(force[Mesh.top_node,:])
     # print(force[top_nbr,:])
     # print(force[bottom_nbr,:])
 
@@ -252,15 +259,15 @@ for t in range(timesteps):
     Mesh.vel += temp_acc
 
     # clamped node
-    for i in range(len(clamped_nodes)):
-        cnode = clamped_nodes[i]
+    for i in range(len(Mesh.clamped_nodes)):
+        cnode = Mesh.clamped_nodes[i]
         Mesh.disp[cnode] = [0, 0, 0]
         Mesh.vel[cnode] = [0, 0, 0]
         Mesh.acc[cnode] = [0, 0, 0]
 
     #plot
     if (t % modulo)==0:
-        print('c', plotcounter)
+        print('c', Mesh.plotcounter)
         # Creating figure
         ax = plt.axes(projection ="3d")
         # Creating plot
@@ -273,9 +280,10 @@ for t in range(timesteps):
         ax.set_ylim3d(-box_L, box_L)
         ax.set_zlim3d(-box_L, box_L)
         # plt.title("simple 3D scatter plot")
-        plt.savefig('img/tc_%05d.png' % plotcounter, dpi=200, bbox_inches='tight')
+        plt.savefig('img/tc_%05d.png' % Mesh.plotcounter, dpi=200, bbox_inches='tight')
         # plt.show()
         plt.close()
-        plotcounter += 1
+        Mesh.plotcounter += 1
 
-# save data to resume
+# save last 
+Mesh.save_state('savedata/Mesh_saved.pkl')
