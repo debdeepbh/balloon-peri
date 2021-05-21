@@ -3,7 +3,7 @@ import pickle
 import matplotlib.pyplot as plt
 # from pathos.multiprocessing import ProcessingPool as Pool
 
-dt = 2e-2
+dt = 2e-1
 timesteps = 50
 # timesteps = 1
 
@@ -19,24 +19,31 @@ top_node = np.argmax(Mesh.pos[:,2])
 print('bottom node', bottom_node)
 
 # nodes to clamp
-clamped_nodes = []
-# clamped_nodes = [bottom_node]
+# clamped_nodes = []
+clamped_nodes = [bottom_node]
 
 # Material properties
 
-E = 72e20
+E = 72e9
 nu = 1/3
 cnot = 6*E/( np.pi * (Mesh.delta**3) * (1 - nu))
 
-Mesh.cnot = cnot
+# division between 1e8:too stiff and 1e10:too loose
+Mesh.cnot = cnot / 1e8
 print('cnot', cnot)
-Mesh.pnot = 100
-Mesh.rho = 10
-Mesh.b = 50
+Mesh.rho = 1000
+
+## pressure properties
+# gravity
+g_val = -1e-7
+Mesh.pnot = 1
+Mesh.b = 10
 
 # plot properties
+modulo = 1
 box_L = 1.5
-modulo = 5
+# print('dim, cam angle', dim,  camera_angle)
+camera_angle = [0, 0]
 
 ## Connectivity to NbdArr
 Mesh.NArr = []
@@ -63,13 +70,15 @@ for i in range(len(Mesh.Conn)):
 ## Initial data
 # Mesh.disp += [0, 0, 0]
 # Mesh.disp += [0, 0, 0.5]
-Mesh.disp[top_node] += [0, 0, 0.5]
+# Mesh.disp[top_node] += [0, 0, 0.5]
 # Mesh.vel += [0, 0, 1]
 # Mesh.vel[top_node] += [0, 0, 0.1]
 # Mesh.acc += [0, 0, 0]
-# Mesh.acc[top_node] += [0, 0, 2e20]
+# Mesh.acc[top_node] += [0, 0, 1e5]
 # Mesh.extforce += [0, 0, 0]
-# Mesh.extforce[top_node] += [0, 0, 2e20]
+## gravity density
+Mesh.extforce += [0, 0, g_val *Mesh.rho]
+# Mesh.extforce[top_node] += [0, 0, 1]
 
 def get_peridynamic_force(Mesh):
     """Compute the peridynamic force
@@ -188,6 +197,9 @@ def get_pressure(Mesh):
 
 top_nbr = Mesh.NArr[top_node]
 print('top node neighbors', top_nbr)
+bottom_nbr = Mesh.NArr[bottom_node]
+print('bottom node neighbors', bottom_nbr)
+
 plotcounter = 1
 for t in range(timesteps):
     print('t', t)
@@ -197,13 +209,14 @@ for t in range(timesteps):
     Mesh.CurrPos = Mesh.pos + Mesh.disp
 
     ## compute force
-    force = get_peridynamic_force(Mesh)
+    Mesh.force = get_peridynamic_force(Mesh)
 
-    print(force[top_node,:])
-    print(force[top_nbr,:])
+    # print(force[top_node,:])
+    # print(force[top_nbr,:])
+    # print(force[bottom_nbr,:])
     # force += get_pressure(Mesh)
-    # P = get_pressure(Mesh)
-    # force += P.pforce
+    P = get_pressure(Mesh)
+    Mesh.force += P.pforce
     # print(P.CurrNormal)
 
     # final update
@@ -226,17 +239,20 @@ for t in range(timesteps):
         Mesh.acc[cnode] = [0, 0, 0]
 
     #plot
-    if t % modulo:
+    if (t % modulo)==0:
         # Creating figure
         ax = plt.axes(projection ="3d")
         # Creating plot
         ax.scatter3D(Mesh.CurrPos[:,0],Mesh.CurrPos[:,1],Mesh.CurrPos[:,2], color='green')
+        # f_norm = np.sqrt(np.sum(Mesh.force**2, axis=0))
+        # ax.scatter3D(Mesh.CurrPos[:,0],Mesh.CurrPos[:,1],Mesh.CurrPos[:,2], c=f_norm)
         # ax.axis('equal')
+        ax.view_init(elev = camera_angle[0], azim = camera_angle[1])
         ax.set_xlim3d(-box_L, box_L)
         ax.set_ylim3d(-box_L, box_L)
         ax.set_zlim3d(-box_L, box_L)
-        plt.title("simple 3D scatter plot")
-        plt.savefig('img/tc_%05d.png' % t)
+        # plt.title("simple 3D scatter plot")
+        plt.savefig('img/tc_%05d.png' % t, bbox_inches='tight')
         # plt.show()
         plt.close()
         plotcounter += 1
