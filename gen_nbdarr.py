@@ -38,7 +38,7 @@ def single_bond(mesh, ij_pair):
     xi = p_j - p_i
     d = np.sqrt(np.sum(np.square(xi))) #norm
     if (d <= delta):
-                return [i,j, xi[0], xi[1], xi[2], d]
+                return [i,j, d]
 
 def oneparam_f_bond(ij):
     return single_bond(Mesh,ij)
@@ -49,10 +49,11 @@ all_bonds = a_pool.map(oneparam_f_bond, pairs)
 # remove all None
 clean = np.array([i for i in all_bonds if i is not None])
 
-Mesh.Conn = clean[:, 0:2]
-Mesh.Conn_xi = clean[:, 2:5]
-Mesh.Conn_xi_norm = clean[:, 5]
+Mesh.Conn = clean[:, 0:2].astype(int)
+Mesh.Conn_xi_norm = clean[:, 2]
 
+print('Conn', Mesh.Conn)
+print('Conn_xi_norm', Mesh.Conn_xi_norm)
 
 # save the mesh
 # np.save('data/Mesh.npy', Mesh, allow_pickle=True)

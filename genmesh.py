@@ -21,11 +21,11 @@ class ReturnValue(object):
         self.bdry_nodes = bdry_nodes
 
         self.Conn = None
-        self.Conn_xi = None
+        # self.Conn_xi = None
         self.Conn_xi_norm = None
 
         self.NArr = None
-        self.xi = None
+        # self.xi = None
         self.xi_norm = None
         
         self.disp = None
@@ -38,6 +38,7 @@ class ReturnValue(object):
 
         # material properties
         self.rho = None
+        self.cnot = None
 
     def get_edges(self):
         """returns all the edges connecting various nodes
