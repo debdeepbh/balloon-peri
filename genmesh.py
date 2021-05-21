@@ -37,8 +37,13 @@ class ReturnValue(object):
         self.CurrPos = None
 
         # material properties
+        self.delta = None
         self.rho = None
         self.cnot = None
+
+        # pressure properties
+        self.pnot = None
+        self.b = None
 
     def get_edges(self):
         """returns all the edges connecting various nodes
@@ -88,7 +93,7 @@ def genmesh(P_bdry, meshsize, msh_file = None, do_plot = True, dotsize = 10, mes
 
     Pos = mesh.points
     total_nodes = len(Pos)
-    # print('Mesh nodes: ', total_nodes)
+    print('Mesh nodes: ', total_nodes)
 
     # elements
     # if dimension==1:
@@ -135,7 +140,8 @@ def genmesh(P_bdry, meshsize, msh_file = None, do_plot = True, dotsize = 10, mes
         # cross product, half
         # cp = 0.5 * abs(u_x * v_y - u_y * v_x)
         crossp = np.cross( [u_x, u_y, u_z], [v_x, v_y, v_z])
-        cp = 0.5 * np.sqrt(np.sum(crossp **2))
+        crossp_norm = np.sqrt(np.sum(crossp **2))
+        cp = 0.5 * crossp_norm
 
         # distribute area evenly over the vertices
         j = T[i,0]

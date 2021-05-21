@@ -17,6 +17,9 @@ plot_bonds = 0
 
 Mesh = genmesh(P_bdry=None, meshsize=None, msh_file ='3d_sphere_unit.msh' , do_plot = False, dotsize = 10, mesh_optimize=True )
 
+# store delta in mesh
+Mesh.delta = delta
+
 ##check if nodes are on the surface
 # for i in range(len(Mesh.pos)):
     # p = Mesh.pos[i]
