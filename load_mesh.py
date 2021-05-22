@@ -285,5 +285,7 @@ for t in range(timesteps):
         plt.close()
         Mesh.plotcounter += 1
 
-# save last 
-Mesh.save_state('savedata/Mesh_saved.pkl')
+        if (Mesh.plotcounter % 5)==1:
+            # save last 
+            Mesh.save_state('savedata/Mesh_saved.pkl')
+
