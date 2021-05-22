@@ -31,9 +31,9 @@ python3 load_mesh.py
 
 
 # Baby case
-[x] Spherical shell, generate nodes mesh in 3d
-[x] Generate area elements from the mesh
-[x] Add air pressure based on the triangle area
-[x] clamp at one point
-[ ] take spring constant to be 2d plastic sheet
-[x] simulate using newton's law (Cauchy momentum with body force as pressure) 
+- [x] Spherical shell, generate nodes mesh in 3d
+- [x] Generate area elements from the mesh
+- [x] Add air pressure based on the triangle area
+- [x] clamp at one point
+- [ ] take spring constant to be 2d plastic sheet
+- [x] simulate using newton's law (Cauchy momentum with body force as pressure) 
