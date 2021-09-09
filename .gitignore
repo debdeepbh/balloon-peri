@@ -143,5 +143,7 @@ img/*
 !img/.gitkeep
 savedata/*
 !savedata/.gitkeep
+data/*
+!data/.gitkeep
 
 
