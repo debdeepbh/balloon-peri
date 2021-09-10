@@ -7,8 +7,8 @@ dt = 2e-2
 timesteps = 50000
 # timesteps = 1
 
-resume = True
-# resume = False
+# resume = True
+resume = False
 
 # plot properties
 modulo = 50
