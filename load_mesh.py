@@ -171,6 +171,9 @@ def get_pressure(Mesh):
     Pos = Mesh.CurrPos
 
     for i in range(len(T)):
+        # print('i', i)
+        # print('T[i,0]', T[i,0])
+        # print('T[i,1]', T[i,1])
         u_x = Pos[T[i,1], 0] - Pos[T[i,0], 0]
         u_y = Pos[T[i,1], 1] - Pos[T[i,0], 1]
         u_z = Pos[T[i,1], 2] - Pos[T[i,0], 2]

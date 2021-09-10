@@ -11,11 +11,15 @@ from itertools import combinations
 
 from genmesh import genmesh
 
-delta = 0.7
+# msh_file='mesh/3d_sphere_unit.msh'
+msh_file='mesh/3d_sphere_forloop.msh'
 
+delta = 0.7
 plot_bonds = 0
 
-Mesh = genmesh(P_bdry=None, meshsize=None, msh_file ='mesh/3d_sphere_unit.msh' , do_plot = True, dotsize = 10, mesh_optimize=True )
+# Mesh = genmesh(P_bdry=None, meshsize=None,  msh_file=msh_file , do_plot = True, dotsize = 10, mesh_optimize=True )
+# def genmesh(P_bdry, meshsize, pygmsh_geom=None, msh_file = None, do_plot = True, dimension = 2, dotsize = 10, mesh_optimize=True):
+Mesh =  genmesh(P_bdry=None, meshsize=None, pygmsh_geom=None, msh_file=msh_file, dimension=3, mesh_optimize=True)
 
 # store delta in mesh
 Mesh.delta = delta
