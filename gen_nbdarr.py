@@ -12,6 +12,8 @@ from itertools import combinations
 from genmesh import genmesh
 
 # msh_file='mesh/3d_sphere_unit.msh'
+## specify ngores here that was used in mesh/<filename>.geo
+ngores = 30
 msh_file='mesh/3d_sphere_forloop.msh'
 
 delta = 0.7
@@ -50,6 +52,7 @@ def single_bond(mesh, ij_pair):
 def oneparam_f_bond(ij):
     return single_bond(Mesh,ij)
 
+print('Generating neighbor list')
 ## parallel attempt
 a_pool = Pool()
 all_bonds = a_pool.map(oneparam_f_bond, pairs) 
@@ -58,6 +61,10 @@ clean = np.array([i for i in all_bonds if i is not None])
 
 Mesh.Conn = clean[:, 0:2].astype(int)
 Mesh.Conn_xi_norm = clean[:, 2]
+
+# gores and nodes on tendon
+Mesh.ngores = ngores
+Mesh.gen_nodes_on_tendon()
 
 print('Conn', Mesh.Conn)
 print('Conn_xi_norm', Mesh.Conn_xi_norm)

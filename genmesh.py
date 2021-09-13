@@ -51,8 +51,40 @@ class ReturnValue(object):
         self.top_node = None
         self.bottom_node = None
 
+        self.ngores = None
+        self.nodes_tendon = []
+
         # plot related
         self.plotcounter = 1
+
+    def gen_nodes_on_tendon(self):
+        """Generates a list of nodes which are on the tendon
+        """
+
+        print('Generating nodes on tendon')
+        test_dir = []
+        for i in range(self.ngores):
+            xval = np.cos(2*np.pi/self.ngores*i)
+            yval = np.sin(2*np.pi/self.ngores*i)
+            test_dir.append(np.array([xval, yval]))
+
+        for i in range(len(self.pos)):
+            vec = self.pos[i][0:2]
+            pos_norm = np.sqrt(np.sum(vec**2))
+            if pos_norm:
+                node_unit = vec / pos_norm
+                for j in range(self.ngores):
+                    test_unit = test_dir[j]
+                    diff = np.sqrt(np.sum((node_unit  - test_unit)**2, axis = 0))
+                    if diff < 1e-5:
+                        self.nodes_tendon.append(i)
+
+        self.nodes_tendon = list(set(self.nodes_tendon))
+        print('Total nodes on tendon', len(self.nodes_tendon))
+
+        # Generate 1d neighborlist for nodes on tendon
+
+        
 
     def save_state(self, filename):
         """Save Mesh with current values to disk using pickle

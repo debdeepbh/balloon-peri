@@ -16,12 +16,19 @@ pip3 install -r requirements.txt
 # Running
 
 - Generate the surface mesh (set meshsize etc within the file) with
+
+New:
+```
+mesh/3d_sphere_forloop.geo
+```
+
+Old (don't use):
 ```
 gmsh mesh/3d_sphere_unit.geo -2
 ```
 (`mesh/3d_sphere_forloop.geo` has nodes on the tendons)
 
-- Generate neighborhood array (set peridynamic neighborhood `delta` here)
+- Generate neighborhood array (set `ngores` and peridynamic neighborhood `delta` here)
 ```
 python3 gen_nbdarr.py
 ```

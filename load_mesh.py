@@ -18,9 +18,10 @@ modulo = 50
 box_L = 1.5
 # print('dim, cam angle', dim,  camera_angle)
 camera_angle = [0, 0]
-dotsize = 2
 
-plot_nodes = 0
+plot_nodes = 1
+plot_nodes_on_tendon = 1
+dotsize = 0.5
 plot_mesh = 1
 linewidth=0.1
 
@@ -42,7 +43,7 @@ else:
 
     Mesh.bottom_node = np.argmin(Mesh.pos[:,2])  
     Mesh.top_node = np.argmax(Mesh.pos[:,2])  
-    print('bottom node', Mesh.bottom_node)
+    #print('bottom node', Mesh.bottom_node)
 
     # nodes to clamp
     # clamped_nodes = []
@@ -285,6 +286,8 @@ for t in range(timesteps):
         # Creating plot
         if plot_nodes:
             ax.scatter3D(Mesh.CurrPos[:,0],Mesh.CurrPos[:,1],Mesh.CurrPos[:,2], color='green', s=dotsize)
+        if plot_nodes_on_tendon:
+            ax.scatter3D(Mesh.CurrPos[Mesh.nodes_tendon,0],Mesh.CurrPos[Mesh.nodes_tendon,1],Mesh.CurrPos[Mesh.nodes_tendon,2], color='blue', s=dotsize)
 
         if plot_mesh:
             edges = Mesh.get_edges()

@@ -1,6 +1,6 @@
 rad = 1;
 // Meshsize
-lc = 0.5;
+lc = 0.1;
 ngores = 30;
 
 // Center, north and south poles
