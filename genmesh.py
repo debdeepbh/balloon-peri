@@ -28,6 +28,16 @@ class ReturnValue(object):
         self.NArr = None
         # self.xi = None
         self.xi_norm = None
+
+        # for tendons
+        self.ngores = None
+        self.nodes_tendon = []
+        # self.nodes_tendon_id = None
+        self.tendon_id = None
+        # self.Conn_tendon = None
+        # self.Conn_xi_norm_tendon = None
+        self.NArr_tendon = None
+        self.xi_norm_tendon = None
         
         self.disp = None
         self.vel = None
@@ -51,9 +61,6 @@ class ReturnValue(object):
         self.top_node = None
         self.bottom_node = None
 
-        self.ngores = None
-        self.nodes_tendon = []
-
         # plot related
         self.plotcounter = 1
 
@@ -68,6 +75,10 @@ class ReturnValue(object):
             yval = np.sin(2*np.pi/self.ngores*i)
             test_dir.append(np.array([xval, yval]))
 
+        self.tendon_id = []
+        for i in range(len(self.pos)):
+            self.tendon_id.append([])
+
         for i in range(len(self.pos)):
             vec = self.pos[i][0:2]
             pos_norm = np.sqrt(np.sum(vec**2))
@@ -76,13 +87,21 @@ class ReturnValue(object):
                 for j in range(self.ngores):
                     test_unit = test_dir[j]
                     diff = np.sqrt(np.sum((node_unit  - test_unit)**2, axis = 0))
-                    if diff < 1e-5:
+                    if diff < 1e-8:
                         self.nodes_tendon.append(i)
+                        # need to treat to and bottom node separately
+                        self.tendon_id[i].append(j)
+            else:
+                ## fix for top and bottom node
+                # if pos_norm is zero, must be on the z-axis, hence top or bottom node
+                self.nodes_tendon.append(i)
+                # need to treat to and bottom node separately
+                self.tendon_id[i].append(-1)
 
         self.nodes_tendon = list(set(self.nodes_tendon))
         print('Total nodes on tendon', len(self.nodes_tendon))
+        # print('tendon_id', self.tendon_id)
 
-        # Generate 1d neighborlist for nodes on tendon
 
         
 

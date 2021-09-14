@@ -52,7 +52,11 @@ def single_bond(mesh, ij_pair):
 def oneparam_f_bond(ij):
     return single_bond(Mesh,ij)
 
-print('Generating neighbor list')
+# gores and nodes on tendon
+Mesh.ngores = ngores
+Mesh.gen_nodes_on_tendon()
+
+print('Generating pairwise reference distance and connectivity.')
 ## parallel attempt
 a_pool = Pool()
 all_bonds = a_pool.map(oneparam_f_bond, pairs) 
@@ -62,12 +66,15 @@ clean = np.array([i for i in all_bonds if i is not None])
 Mesh.Conn = clean[:, 0:2].astype(int)
 Mesh.Conn_xi_norm = clean[:, 2]
 
+print('Conn', Mesh.Conn)
+print('Conn_xi_norm', Mesh.Conn_xi_norm)
+
 # gores and nodes on tendon
 Mesh.ngores = ngores
 Mesh.gen_nodes_on_tendon()
 
-print('Conn', Mesh.Conn)
-print('Conn_xi_norm', Mesh.Conn_xi_norm)
+
+
 
 # save the mesh
 # np.save('data/Mesh.npy', Mesh, allow_pickle=True)

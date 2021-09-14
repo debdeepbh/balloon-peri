@@ -1,5 +1,6 @@
 import  numpy as np
 import pickle
+import copy
 import matplotlib.pyplot as plt
 # from pathos.multiprocessing import ProcessingPool as Pool
 # from matplotlib.collections import LineCollection
@@ -72,6 +73,7 @@ else:
     Mesh.b = 500
 
     ## Connectivity to NbdArr
+    print('Converting connectivity to NbdArr')
     Mesh.NArr = []
     # Mesh.xi = []
     Mesh.xi_norm = []
@@ -89,9 +91,62 @@ else:
 
         Mesh.xi_norm[p].append(d)
         Mesh.xi_norm[q].append(d)
-
     # print(Mesh.NArr)
     # print(Mesh.xi_norm)
+
+    # NbdArr for tendon, trim the main arrays to generate
+    print('Generating tendon connectivity')
+    Mesh.NArr_tendon = []
+    Mesh.xi_norm_tendon = []
+
+    print('top nodes', Mesh.top_node)
+    print('bottom nodes', Mesh.bottom_node)
+
+    for i in range(len(Mesh.pos)):
+        Mesh.NArr_tendon.append([])
+        Mesh.xi_norm_tendon.append([])
+
+    for i in range(len(Mesh.Conn)):
+        v = Mesh.Conn[i]
+        p = v[0]
+        q = v[1]
+        d = Mesh.Conn_xi_norm[i]
+
+        p_id = Mesh.tendon_id[p]
+        q_id = Mesh.tendon_id[q]
+
+        if len(p_id) and len(q_id):
+            # if tendon id matches
+            if (p_id[0] == q_id[0]):
+                # print('tendon matches')
+
+                # need to treat top and bottom nodes separately
+                Mesh.NArr_tendon[p].append(q)
+                Mesh.NArr_tendon[q].append(p)
+
+                Mesh.xi_norm_tendon[p].append(d)
+                Mesh.xi_norm_tendon[q].append(d)
+
+            # fix for top and bottom node, with tendon_id = -1
+            # any nonzero tendon id is a neighbor, if close enough
+            if (p_id[0] == (-1)) or (q_id[0] == (-1)) :
+                # print('top or bottom node', p, q)
+                Mesh.NArr_tendon[p].append(q)
+                Mesh.NArr_tendon[q].append(p)
+                Mesh.xi_norm_tendon[p].append(d)
+                Mesh.xi_norm_tendon[q].append(d)
+
+        else:
+            pass
+            # print('is [] for', p,' and', q)
+    print('Done')
+    # print(Mesh.NArr_tendon[0])
+    # print(Mesh.NArr_tendon[1])
+    # print('id')
+    # print(Mesh.tendon_id[0])
+    # print(Mesh.tendon_id[1])
+    # print(Mesh.xi_norm_tendon)
+
 
     ## Initial data
     # Mesh.disp += [0, 0, 0]
@@ -224,9 +279,9 @@ def get_pressure(Mesh):
     return PressureQ(pforce, CurrArea=area, CurrNormal=unormal)
 
 top_nbr = Mesh.NArr[Mesh.top_node]
-print('top node neighbors', top_nbr)
+# print('top node neighbors', top_nbr)
 bottom_nbr = Mesh.NArr[Mesh.bottom_node]
-print('bottom node neighbors', bottom_nbr)
+# print('bottom node neighbors', bottom_nbr)
 
 # print('Initial mean disp', np.mean(Mesh.disp, axis = 0))
 
