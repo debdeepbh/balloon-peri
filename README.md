@@ -41,8 +41,9 @@ python3 load_mesh.py
 
 # Baby case
 - [ ] Nodes on tendon
-	- [-] (Need to treat top and bottom nodes separately) Generate neighborhood for nodes on tendon
+	- [x] (Need to treat top and bottom nodes separately) Generate neighborhood for nodes on tendon
 	- [ ] Implement 1-d peridynamics on those
+	- [ ] compute 1d peridynamic constant
 - [ ] take spring constant to be 2d plastic sheet
 - [ ] Take reference length to be either the flat distance or the distance along the sphere.
 - [x] Spherical shell, generate nodes mesh in 3d
