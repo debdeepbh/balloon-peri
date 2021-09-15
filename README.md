@@ -17,9 +17,13 @@ pip3 install -r requirements.txt
 
 - Generate the surface mesh (set meshsize etc within the file) with
 
-New:
+Full-size (150 m as half-diameter):
 ```
-mesh/3d_sphere_forloop.geo
+mesh/3d_sphere_forloop_big.geo -2 
+```
+
+```
+mesh/3d_sphere_forloop.geo -2
 ```
 
 Old (don't use):
@@ -28,7 +32,7 @@ gmsh mesh/3d_sphere_unit.geo -2
 ```
 (`mesh/3d_sphere_forloop.geo` has nodes on the tendons)
 
-- Generate neighborhood array (set `ngores` and peridynamic neighborhood `delta` here)
+- Generate neighborhood array (set `msh` file name, `ngores`, and peridynamic horizon size `delta` here)
 ```
 python3 gen_nbdarr.py
 ```
@@ -38,6 +42,12 @@ python3 load_mesh.py
 ```
 - Resuming is possible by setting `resume = True` in `load_mesh.py` and running `python3 load_mesh.py` again.
 
+# Bug for `main`
+- compute pressure from the bottom of the balloon
+
+```
+pf = (Mesh.pnot + Mesh.b*(z_cent - z_0) ) * cp  * udir
+```
 
 # Baby case
 - [ ] Nodes on tendon

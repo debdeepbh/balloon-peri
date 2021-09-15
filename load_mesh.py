@@ -7,7 +7,8 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
 
-dt = 2e-2
+# dt = 2e-2
+dt = 8e-2
 timesteps = 50000
 # timesteps = 1
 
@@ -15,13 +16,15 @@ timesteps = 50000
 resume = False
 
 # plot properties
-modulo = 50
-box_L = 1.5
+# modulo = 50
+modulo = 100
+# box_L = 1.5
+box_L = 50 * 1.5
 # print('dim, cam angle', dim,  camera_angle)
 camera_angle = [0, 0]
 
-plot_nodes = 1
-plot_nodes_on_tendon = 1
+plot_nodes = 0
+plot_nodes_on_tendon = 0
 dotsize = 0.5
 plot_mesh = 1
 linewidth=0.1
@@ -46,6 +49,10 @@ else:
     Mesh.top_node = np.argmax(Mesh.pos[:,2])  
     #print('bottom node', Mesh.bottom_node)
 
+    # z-value of the bottom of the balloon
+    z_0 = Mesh.pos[Mesh.bottom_node,2]
+    # print('z_0', z_0)
+
     # nodes to clamp
     # clamped_nodes = []
     Mesh.clamped_nodes = [Mesh.bottom_node]
@@ -69,8 +76,11 @@ else:
     ## pressure properties
     # gravity
     g_val = -10
-    Mesh.pnot = 100
-    Mesh.b = 500
+    # Mesh.pnot = 100
+    # Mesh.b = 500
+    # From Frank's code: tauVol = V_d/TargetVolume ;% 0.0125; b_d = 0.084887 % N/m^3 buoyancy = b_d * tauVol  ;
+    Mesh.b = 0.104314581941182
+    Mesh.pnot = 1
 
     ## Connectivity to NbdArr
     print('Converting connectivity to NbdArr')
@@ -250,7 +260,9 @@ def get_pressure(Mesh):
         cp = 0.5 * crossp_norm
 
         # full force due to pressure: (P_0 + bz).Area.unit_normal
-        pf = (Mesh.pnot + Mesh.b*z_cent) * cp  * udir
+        # pf = (Mesh.pnot + Mesh.b*z_cent) * cp  * udir
+        # editing to start counting height from the bottom of the balloon
+        pf = (Mesh.pnot + Mesh.b*(z_cent - z_0) ) * cp  * udir
 
         # distribute area evenly over the vertices
         j = T[i,0]

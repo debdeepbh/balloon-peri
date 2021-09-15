@@ -12,11 +12,14 @@ from itertools import combinations
 from genmesh import genmesh
 
 # msh_file='mesh/3d_sphere_unit.msh'
+# msh_file='mesh/3d_sphere_unit_big.msh'
 ## specify ngores here that was used in mesh/<filename>.geo
 ngores = 30
-msh_file='mesh/3d_sphere_forloop.msh'
+# msh_file='mesh/3d_sphere_forloop.msh'
+msh_file='mesh/3d_sphere_forloop_big.msh'
 
-delta = 0.7
+# delta = 0.7
+delta = 0.3 * 47
 plot_bonds = 0
 
 # Mesh = genmesh(P_bdry=None, meshsize=None,  msh_file=msh_file , do_plot = True, dotsize = 10, mesh_optimize=True )
