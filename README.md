@@ -22,6 +22,7 @@ Full-size (150 m as half-diameter):
 mesh/3d_sphere_forloop_big.geo -2 
 ```
 
+Unit sphere with tendons on vertical planes
 ```
 mesh/3d_sphere_forloop.geo -2
 ```
