@@ -48,7 +48,9 @@ def single_bond(mesh, ij_pair):
     p_i = mesh.pos[i]
     p_j = mesh.pos[j]
     xi = p_j - p_i
-    d = np.sqrt(np.sum(np.square(xi))) #norm
+    # d = np.sqrt(np.sum(np.square(xi))) #norm
+    ## curved distance: distance along a great circle on which the points lie
+    d = 2* rad *  np.arcsin( np.sqrt(np.sum(np.square(xi)))/ (2*rad))
     if (d <= delta):
                 return [i,j, d]
 
