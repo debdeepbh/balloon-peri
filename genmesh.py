@@ -30,6 +30,7 @@ class ReturnValue(object):
         self.xi_norm = None
 
         # for tendons
+        self.rad = None
         self.ngores = None
         self.nodes_tendon = []
         # self.nodes_tendon_id = None

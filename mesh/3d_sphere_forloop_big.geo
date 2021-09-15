@@ -1,4 +1,5 @@
-rad = 150/Pi;
+// rad = 150/Pi;
+rad = 47.755;
 // Meshsize
 lc = 5;
 ngores = 30;

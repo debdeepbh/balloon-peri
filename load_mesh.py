@@ -8,7 +8,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
 
 # dt = 2e-2
-dt = 8e-2
+dt = 1e-1
 timesteps = 50000
 # timesteps = 1
 
