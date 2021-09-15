@@ -15,7 +15,8 @@ from genmesh import genmesh
 # msh_file='mesh/3d_sphere_unit_big.msh'
 ## specify ngores here that was used in mesh/<filename>.geo
 ngores = 30
-rad = 47.755
+# rad = 150/np.pi
+rad = 48
 # msh_file='mesh/3d_sphere_forloop.msh'
 msh_file='mesh/3d_sphere_forloop_big.msh'
 
@@ -27,8 +28,10 @@ plot_bonds = 0
 # def genmesh(P_bdry, meshsize, pygmsh_geom=None, msh_file = None, do_plot = True, dimension = 2, dotsize = 10, mesh_optimize=True):
 Mesh =  genmesh(P_bdry=None, meshsize=None, pygmsh_geom=None, msh_file=msh_file, dimension=3, mesh_optimize=True)
 
-# store delta in mesh
+# store data in mesh
 Mesh.delta = delta
+Mesh.ngores = ngores
+Mesh.rad = rad
 
 ##check if nodes are on the surface
 # for i in range(len(Mesh.pos)):
@@ -49,18 +52,16 @@ def single_bond(mesh, ij_pair):
     p_i = mesh.pos[i]
     p_j = mesh.pos[j]
     xi = p_j - p_i
-    # d = np.sqrt(np.sum(np.square(xi))) #norm
-    ## curved distance: distance along a great circle on which the points lie
-    d = 2* mesh.rad *  np.arcsin( np.sqrt(np.sum(np.square(xi)))/ (2*mesh.rad))
+    d = np.sqrt(np.sum(np.square(xi))) #norm
     if (d <= delta):
+                ## curved distance: distance along a great circle on which the points lie
+                d = 2* mesh.rad *  np.arcsin(d/ (2*mesh.rad))
                 return [i,j, d]
 
 def oneparam_f_bond(ij):
     return single_bond(Mesh,ij)
 
 # gores and nodes on tendon
-Mesh.ngores = ngores
-Mesh.rad = rad
 Mesh.gen_nodes_on_tendon()
 
 print('Generating pairwise reference distance and connectivity.')
