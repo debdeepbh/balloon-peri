@@ -56,7 +56,7 @@ pf = (Mesh.pnot + Mesh.b*(z_cent - z_0) ) * cp  * udir
 	- [ ] Implement 1-d peridynamics on those
 	- [ ] compute 1d peridynamic constant
 - [ ] take spring constant to be 2d plastic sheet
-- [ ] Take reference length to be either the flat distance or the distance along the sphere.
+- [x] Take reference length to be either the flat distance or the distance along the sphere.
 - [x] Spherical shell, generate nodes mesh in 3d
 - [x] Generate area elements from the mesh
 - [x] Add air pressure based on the triangle area
