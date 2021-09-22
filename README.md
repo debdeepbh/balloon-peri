@@ -53,8 +53,9 @@ pf = (Mesh.pnot + Mesh.b*(z_cent - z_0) ) * cp  * udir
 # Baby case
 - [ ] Nodes on tendon
 	- [x] (Need to treat top and bottom nodes separately) Generate neighborhood for nodes on tendon
+	- [x] compute 1d peridynamic constant: $3 \lambda/ \delta^3$ where $\lambda$ is the Lame coefficient.
+	- [ ] What is the correct modulus to use for 1d peridynamics?
 	- [ ] Implement 1-d peridynamics on those
-	- [ ] compute 1d peridynamic constant
 - [ ] take spring constant to be 2d plastic sheet
 - [x] Take reference length to be either the flat distance or the distance along the sphere.
 - [x] Spherical shell, generate nodes mesh in 3d

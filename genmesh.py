@@ -52,6 +52,7 @@ class ReturnValue(object):
         self.delta = None
         self.rho = None
         self.cnot = None
+        self.LinDenT = None
 
         # pressure properties
         self.pnot = None

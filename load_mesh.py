@@ -15,6 +15,8 @@ timesteps = 50000
 # resume = True
 resume = False
 
+allow_damping = 1
+
 # plot properties
 # modulo = 50
 modulo = 100
@@ -61,8 +63,11 @@ else:
 
     # E = 72e9
     E = 0.3e9 # Polyethylene (low density) LDPE 
+    LinDenT =0.015205; # kg/m	# linear density of the tendon
     nu = 1/3
     cnot = 6*E/( np.pi * (Mesh.delta**3) * (1 - nu))
+
+    damping_coeff = 10
 
     # division between 1e8:too stiff and 1e10:too loose
     Mesh.cnot = cnot
@@ -72,6 +77,13 @@ else:
     thickness = 50e-6 # 0.05 mm
     Mesh.rho = 920 # LDPE 920 kg/m^3
     # Mesh.rho = 920 * thickness # LDPE 920 kg/m^3
+
+    # Is this the right unit to use?
+    Mesh.tendon_modulus = LinDenT
+    Mesh.cnot_1d = 3 * Mesh.tendon_modulus / (Mesh.delta**3)
+
+    Mesh.allow_damping = allow_damping
+    Mesh.damping_coeff = damping_coeff
 
     ## pressure properties
     # gravity
@@ -324,6 +336,9 @@ for t in range(timesteps):
     # Mesh.force += P.pforce
     # print(P.CurrNormal)
 
+    if Mesh.allow_damping:
+        Mesh.force -= Mesh.damping_coeff * Mesh.vel
+
     # final update
     Mesh.acc = (1 / Mesh.rho) * (Mesh.force + Mesh.extforce)
     #	# velocity
@@ -335,6 +350,7 @@ for t in range(timesteps):
     temp_acc += Mesh.acc   # Now temp_acc = (acc + acc_old)
     temp_acc *= (0.5 * dt) # now temp_acc = (dt*0.5) *(acc + acc_old)
     Mesh.vel += temp_acc
+
 
     # clamped node
     for i in range(len(Mesh.clamped_nodes)):
