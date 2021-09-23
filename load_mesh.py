@@ -16,6 +16,8 @@ resume = False
 
 allow_damping = 0
 
+initial_perturbation = 1
+
 # plot properties
 # modulo = 50
 modulo = 100
@@ -171,6 +173,22 @@ else:
     # Mesh.disp += [0, 0, 0]
     # Mesh.disp += [0, 0, 0.5]
     # Mesh.disp[Mesh.top_node] += [0, 0, 0.5]
+
+    if initial_perturbation:
+        for i in range(len(Mesh.pos)):
+            param = 0.2
+
+            pos_xy = Mesh.pos[i][0:2]
+            pos_z = Mesh.pos[i][2]
+
+            norm_xy = np.sqrt(np.sum(pos_xy**2))
+            if not norm_xy:
+                norm_xy = 1
+
+            unit_xy = pos_xy / norm_xy
+            Mesh.disp[i] = -(-pos_z**2/ (Mesh.rad**2) + 1) * param * Mesh.rad * np.array([unit_xy[0], unit_xy[1], 0])
+
+
     # Mesh.vel += [0, 0, 1]
     # Mesh.vel[Mesh.top_node] += [0, 0, 1e2]
     # Mesh.acc += [0, 0, 0]

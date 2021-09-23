@@ -51,7 +51,7 @@ python3 plot_steps.py
 # Todo
 
 - [ ] Incorrect cnot in 2D; (correct expression for 2d constant `cnot` and `dt=1e-4` works)
-- [ ] `cnot_1d`: the constant and integrand do not match
+- [x] `cnot_1d`: the constant and integrand do not match
 
 - [ ] Nodes on tendon
 	- [ ] What is the correct modulus to use for 1d peridynamics?

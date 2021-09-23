@@ -1,9 +1,9 @@
 rad = 48;
 //rad = 150/Pi;
 // Meshsize
-//lc = 5;
-lc = 10;
-ngores = 30;
+lc = 5;
+//lc = 10;
+ngores = 20;
 
 // Center, north and south poles
 //+
