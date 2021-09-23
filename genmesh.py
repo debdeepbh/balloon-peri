@@ -53,6 +53,7 @@ class ReturnValue(object):
         self.rad = None
         self.ngores = None
         self.nodes_tendon = []
+        self.len_t = None
         # self.nodes_tendon_id = None
         self.tendon_id = None
         # self.Conn_tendon = None
@@ -123,6 +124,28 @@ class ReturnValue(object):
         self.nodes_tendon = list(set(self.nodes_tendon))
         print('Total nodes on tendon', len(self.nodes_tendon))
         # print('tendon_id', self.tendon_id)
+
+        ####
+        # generate length elements for nodes associated with the tendons #
+        ####
+        print('# Generating length elements for nodes associated with the tendons #')
+        t_set = set(self.nodes_tendon)
+        Pos = self.pos
+        self.len_t = np.zeros((len(Pos), 1))
+        for i in range(len(self.edges)):
+            edge = self.edges[i]
+            if (set(edge)).issubset(t_set):
+                l = Pos[edge[1]] - Pos[edge[0]]
+                cp = np.sqrt(np.sum(l**2))
+
+                # distribute length evenly over the endpoints
+                j = edge[0]
+                self.len_t[j] += cp/2
+                j = edge[1]
+                self.len_t[j] += cp/2
+        # print(self.len_t)
+
+        
 
 
         
@@ -338,6 +361,7 @@ def genmesh(P_bdry, meshsize, pygmsh_geom=None, msh_file = None, dimension = 2, 
     area = np.zeros((total_nodes, 1))
     length = np.zeros((total_nodes, 1))
 
+
     # 2D
 
     if dimension==1:
@@ -377,16 +401,16 @@ def genmesh(P_bdry, meshsize, pygmsh_geom=None, msh_file = None, dimension = 2, 
             j = T[i,2]
             area[j] += cp/3
 
-        # let the length elements
-        for i in range(len(edges)):
-            l = Pos[edges[i,1]] - Pos[edges[i,0]]
-            cp = np.sqrt(np.sum(l**2))
+        ## get the length elements
+        # for i in range(len(edges)):
+            # l = Pos[edges[i,1]] - Pos[edges[i,0]]
+            # cp = np.sqrt(np.sum(l**2))
 
-            # distribute length evenly over the endpoints
-            j = edges[i,0]
-            length[j] += cp/2
-            j = edges[i,1]
-            length[j] += cp/2
+            # # distribute length evenly over the endpoints
+            # j = edges[i,0]
+            # length[j] += cp/2
+            # j = edges[i,1]
+            # length[j] += cp/2
 
     ## removing nodes with zero volume
     nodelist_zero_vol = np.where(area == 0)[0]
@@ -419,13 +443,10 @@ def genmesh(P_bdry, meshsize, pygmsh_geom=None, msh_file = None, dimension = 2, 
         print(len(Pos))
         print(len(area))
 
-    ## removing nodes with zero length
-    nodelist_zero_length = np.where(length == 0)[0]
-    if len(nodelist_zero_length) > 0:
-        print('Caution: there are nodes with zero length: ', nodelist_zero_length)
-        print('Bad node that participates in generating elements (and cannot be safely removed) are ', set(range(1, len(Pos))).difference(set(edges.flatten())))
-
-        zero_l_nodes = set(range(1, len(Pos))).difference(set(edges.flatten()))
+    # nodelist_zero_length = np.where(length == 0)[0]
+    # if len(nodelist_zero_length) > 0:
+        # print('Caution: there are nodes with zero length: ', nodelist_zero_length)
+        # print('Bad node that participates in generating elements (and cannot be safely removed) are ', set(range(1, len(Pos))).difference(set(edges.flatten())))
 
     return ReturnValue(Pos, area, bdry_nodes, T, edges)
 
