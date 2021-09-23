@@ -11,13 +11,32 @@ from mpl_toolkits.mplot3d import Axes3D
 
 import meshio
 
+def get_edges(T):
+    """returns all the edges connecting various nodes
+    : T: triangles 
+    """
+    E1 = np.c_[T[:,0], T[:,1]]
+    E2 = np.c_[T[:,1], T[:,2]]
+    E3 = np.c_[T[:,2], T[:,0]]
+
+    E = np.r_[E1, E2, E3]
+    # sort
+    E.sort(axis = 1)
+    # select the unique rows
+    E = np.unique(E, axis = 0)
+    return E
+
+
 class ReturnValue(object):
     """Returns the position of nodes and nodal volume"""
-    def __init__(self, pos, vol, bdry_nodes, T, bdry_edges):
+    def __init__(self, pos, vol, bdry_nodes, T, edges):
+
+        self.zero_l_nodes = None
+
         self.pos = pos
         self.vol = vol
         self.T = T
-        self.bdry_edges = bdry_edges
+        self.edges = edges
 
         self.bdry_nodes = bdry_nodes
 
@@ -114,20 +133,6 @@ class ReturnValue(object):
         """
         with open(filename, 'wb') as file_h:
           pickle.dump(self, file_h)
-
-    def get_edges(self):
-        """returns all the edges connecting various nodes
-        """
-        E1 = np.c_[self.T[:,0], self.T[:,1]]
-        E2 = np.c_[self.T[:,1], self.T[:,2]]
-        E3 = np.c_[self.T[:,2], self.T[:,0]]
-
-        E = np.r_[E1, E2, E3]
-        # sort
-        E.sort(axis = 1)
-        # select the unique rows
-        E = np.unique(E, axis = 0)
-        return E
 
     def plot(self, dotsize=10, plot_node_text=True, highlight_bdry_nodes=True):
         """plot the mesh
@@ -264,10 +269,16 @@ def genmesh(P_bdry, meshsize, pygmsh_geom=None, msh_file = None, dimension = 2, 
     elif dimension == 3:
         # T = mesh.get_cells_type("tetra")
         T = mesh.get_cells_type("triangle")
+        # all lines
+        # edges = mesh.get_cells_type("line")
+        edges = get_edges(T)
+        temp = edges.flatten()
+        bdry_nodes = list(set(temp))
 
     # print('Total T: ', len(T))
 
     area = np.zeros((total_nodes, 1))
+    length = np.zeros((total_nodes, 1))
 
     # 2D
 
@@ -308,17 +319,22 @@ def genmesh(P_bdry, meshsize, pygmsh_geom=None, msh_file = None, dimension = 2, 
             j = T[i,2]
             area[j] += cp/3
 
+        # let the length elements
+        for i in range(len(edges)):
+            l = Pos[edges[i,1]] - Pos[edges[i,0]]
+            cp = np.sqrt(np.sum(l**2))
+
+            # distribute length evenly over the endpoints
+            j = edges[i,0]
+            length[j] += cp/2
+            j = edges[i,1]
+            length[j] += cp/2
+
+    ## removing nodes with zero volume
     nodelist_zero_vol = np.where(area == 0)[0]
     if len(nodelist_zero_vol) > 0:
         print('Caution: there are nodes with zero volume: ', nodelist_zero_vol)
         print('Bad node that participates in generating elements (and cannot be safely removed) are ', set(range(1, len(Pos))).difference(set(T.flatten())))
-
-        # for jj in range(len(nodelist_zero_vol)):
-            # badnode = nodelist_zero_vol[jj]
-            # print('badnode', badnode)
-            # occurrences = np.where(T == badnode)
-            # print('badnode', badnode, 'appears in element', occurrences)
-            
 
         #u delete the nodes
         # Pos[nodelist_zero_vol] = []
@@ -336,35 +352,22 @@ def genmesh(P_bdry, meshsize, pygmsh_geom=None, msh_file = None, dimension = 2, 
                 for bb in range(len(T[aa])):
                     if T[aa][bb] > badnode:
                         T[aa][bb] -= 1
-
+            # do the same for edges
+            for aa in range(len(edges)):
+                for bb in range(len(edges[aa])):
+                    if edges[aa][bb] > badnode:
+                        edges[aa][bb] -= 1
         ## rename an
         print(len(Pos))
         print(len(area))
 
+    ## removing nodes with zero length
+    nodelist_zero_length = np.where(length == 0)[0]
+    if len(nodelist_zero_length) > 0:
+        print('Caution: there are nodes with zero length: ', nodelist_zero_length)
+        print('Bad node that participates in generating elements (and cannot be safely removed) are ', set(range(1, len(Pos))).difference(set(edges.flatten())))
 
+        zero_l_nodes = set(range(1, len(Pos))).difference(set(edges.flatten()))
 
-    # Boundary info
-    if dimension==1:
-        # all nodes are boundary nodes for 1d mesh in 2d manifold
-        bdry_edges = mesh.get_cells_type("line")
-        temp = bdry_edges.flatten()
-        bdry_nodes = list(set(temp))
-    elif dimension==2:
-        bdry_edges = mesh.get_cells_type("line")
-        temp = bdry_edges.flatten()
-        bdry_nodes = list(set(temp))
-    elif dimension==3:
-        # bdry_edges = mesh.get_cells_type("line")
-        bdry_edges = mesh.get_cells_type("triangle")
-        # bdry_edges = mesh.get_cells_type("tetra")
-        temp = bdry_edges.flatten()
-        bdry_nodes = list(set(temp))
-
-    # print('All nodes excepts the ones participating in generating edges', set(range(1, len(Pos))).difference(set(np.array(bdry_nodes).flatten())))
-    # print('all nodes', range(len(Pos)))
-    # print('bdry_nodes', bdry_nodes)
-    # print('bdry_edges', bdry_edges)
-
-
-    return ReturnValue(Pos, area, bdry_nodes, T, bdry_edges)
+    return ReturnValue(Pos, area, bdry_nodes, T, edges)
 

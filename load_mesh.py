@@ -15,7 +15,7 @@ timesteps = 50000
 # resume = True
 resume = False
 
-allow_damping = 1
+allow_damping = 0
 
 # plot properties
 # modulo = 50
@@ -79,8 +79,11 @@ else:
     # Mesh.rho = 920 * thickness # LDPE 920 kg/m^3
 
     # Is this the right unit to use?
+    # Mesh.tendon_modulus = LinDenT
     Mesh.tendon_modulus = LinDenT
-    Mesh.cnot_1d = 3 * Mesh.tendon_modulus / (Mesh.delta**3)
+    Mesh.cnot_tendon = 3 * Mesh.tendon_modulus / (Mesh.delta**3)
+
+    print('cnot_tendon', Mesh.cnot_tendon)
 
     Mesh.allow_damping = allow_damping
     Mesh.damping_coeff = damping_coeff
@@ -116,7 +119,7 @@ else:
     # print(Mesh.NArr)
     # print(Mesh.xi_norm)
 
-    # NbdArr for tendon, trim the main arrays to generate
+    # NbdArr for tendons
     print('Generating tendon connectivity')
     Mesh.NArr_tendon = []
     Mesh.xi_norm_tendon = []
@@ -149,7 +152,7 @@ else:
                 Mesh.xi_norm_tendon[p].append(d)
                 Mesh.xi_norm_tendon[q].append(d)
 
-            # fix for top and bottom node, with tendon_id = -1
+            # top and bottom nodes have tendon_id = -1
             # any nonzero tendon id is a neighbor, if close enough
             if (p_id[0] == (-1)) or (q_id[0] == (-1)) :
                 # print('top or bottom node', p, q)
@@ -216,6 +219,43 @@ def get_peridynamic_force(Mesh):
         # print(n_unit_dir)
 
         nsum_force = np.sum(Mesh.cnot * n_strain * n_unit_dir * n_vol, axis=0)
+
+        # return nsum_force
+        force[i,:] = nsum_force
+
+    ## parallel attempt: slow for small number of nodes
+    # a_pool = Pool()
+    # force = a_pool.map(one_row, range(total_nodes)) 
+    # force = np.array(force)
+    # print(force)
+
+    return force
+
+def get_peridynamic_force_tendon(Mesh):
+    """Compute the peridynamic force
+    :Mesh: TODO
+    :returns: TODO
+    """
+    force = np.zeros((total_nodes, 3))
+
+    for i in range(total_nodes):
+    # def one_row(i):
+        nbrs = Mesh.NArr_tendon[i]
+        nsum_force = 0
+
+        if len(nbrs):
+            n_etapxi = Mesh.CurrPos[nbrs] - Mesh.CurrPos[i]
+            n_etapxi_norm =  np.sqrt(np.sum(n_etapxi**2, axis=1))
+            n_strain = np.array([(n_etapxi_norm - Mesh.xi_norm_tendon[i]) / Mesh.xi_norm_tendon[i]]).transpose()
+
+            # replace negative values by zero
+            n_strain[n_strain < 0] = 0
+
+            # check if dividing by zero
+            # n_unit_dir = n_etapxi / n_etapxi_norm
+            n_unit_dir = np.array([p/np for p,np in zip(n_etapxi , n_etapxi_norm)])
+            n_vol = Mesh.vol[nbrs]
+            nsum_force = np.sum(Mesh.cnot_tendon * n_strain * n_unit_dir * n_vol, axis=0)
 
         # return nsum_force
         force[i,:] = nsum_force
@@ -330,6 +370,8 @@ for t in range(timesteps):
     # print(force[top_nbr,:])
     # print(force[bottom_nbr,:])
 
+    Mesh.force += get_peridynamic_force_tendon(Mesh)
+
     P = get_pressure(Mesh)
     # convert force to force density
     Mesh.force += ( P.pforce / Mesh.vol)
@@ -373,7 +415,9 @@ for t in range(timesteps):
             ax.scatter3D(Mesh.CurrPos[Mesh.nodes_tendon,0],Mesh.CurrPos[Mesh.nodes_tendon,1],Mesh.CurrPos[Mesh.nodes_tendon,2], color='blue', s=dotsize)
 
         if plot_mesh:
-            edges = Mesh.get_edges()
+            # debug
+            edges = Mesh.edges
+
             V1 = edges[:,0]
             V2 = edges[:,1]
 
