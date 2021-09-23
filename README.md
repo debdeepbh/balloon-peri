@@ -43,20 +43,20 @@ python3 load_mesh.py
 ```
 - Resuming is possible by setting `resume = True` in `load_mesh.py` and running `python3 load_mesh.py` again.
 
-# Bug for `main`
-- compute pressure from the bottom of the balloon
-
+- Convert saved files into images using
 ```
-pf = (Mesh.pnot + Mesh.b*(z_cent - z_0) ) * cp  * udir
+python3 plot_steps.py
 ```
 
-# Baby case
+# Todo
 - [ ] Nodes on tendon
 	- [x] (Need to treat top and bottom nodes separately) Generate neighborhood for nodes on tendon
 	- [x] compute 1d peridynamic constant: $3 \lambda/ \delta^3$ where $\lambda$ is the Lame coefficient.
 	- [ ] What is the correct modulus to use for 1d peridynamics?
-	- [ ] Implement 1-d peridynamics on those
+	- [ ] Implement 1-d peridynamics on tendon
+
 - [ ] take spring constant to be 2d plastic sheet
+
 - [x] Take reference length to be either the flat distance or the distance along the sphere.
 - [x] Spherical shell, generate nodes mesh in 3d
 - [x] Generate area elements from the mesh
