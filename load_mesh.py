@@ -51,7 +51,8 @@ else:
 
     # E = 72e9
     E = 0.3e9 # Polyethylene (low density) LDPE 
-    LinDenT =0.015205; # kg/m	# linear density of the tendon
+    LinDenT =0.015205 # kg/m	# linear density of the tendon
+    ETape = 761560
     nu = 1/3
     cnot = 6*E/( np.pi * (Mesh.delta**3) * (1 - nu))
 
@@ -68,10 +69,14 @@ else:
 
     # Is this the right unit to use?
     # Mesh.tendon_modulus = LinDenT
-    Mesh.tendon_modulus = LinDenT
+    Mesh.LinDenT = LinDenT
+    Mesh.tendon_modulus = ETape
     Mesh.cnot_tendon = 3 * Mesh.tendon_modulus / (Mesh.delta**3)
 
     print('cnot_tendon', Mesh.cnot_tendon)
+
+    # mass of the nodes
+    Mesh.mass = Mesh.rho * Mesh.vol + Mesh.LinDenT * Mesh.len_t
 
     Mesh.allow_damping = allow_damping
     Mesh.damping_coeff = damping_coeff
@@ -170,12 +175,11 @@ else:
     # Mesh.acc += [0, 0, 0]
     # Mesh.acc[Mesh.top_node] += [0, 0, 1e5]
     # Mesh.extforce += [0, 0, 0]
-    ## gravity density
-    # Mesh.extforce += [0, 0, g_val *Mesh.rho]
-    # Mesh.extforce[Mesh.top_node] += [0, 0, 1]
+    ## gravity (not density anymore)
+    # Mesh.extforce += [0, 0, g_val * Mesh.mass]
 
-def get_peridynamic_force(Mesh):
-    """Compute the peridynamic force
+def get_peridynamic_force_density(Mesh):
+    """Compute the peridynamic force density
     :Mesh: TODO
     :returns: TODO
     """
@@ -196,16 +200,6 @@ def get_peridynamic_force(Mesh):
         # n_unit_dir = n_etapxi / n_etapxi_norm
         n_unit_dir = np.array([p/np for p,np in zip(n_etapxi , n_etapxi_norm)])
         n_vol = Mesh.vol[nbrs]
-
-        # print(n_unit_dir)
-        # print(n_strain)
-        # print('etapxi', n_CurrPos_norm)
-        # print('xi', Mesh.xi_norm[i])
-        # print(n_CurrPos)
-        # print(n_vol)
-        # print(n_strain)
-        # print(n_unit_dir)
-
         nsum_force = np.sum(Mesh.cnot * n_strain * n_unit_dir * n_vol, axis=0)
 
         # return nsum_force
@@ -219,8 +213,8 @@ def get_peridynamic_force(Mesh):
 
     return force
 
-def get_peridynamic_force_tendon(Mesh):
-    """Compute the peridynamic force
+def get_peridynamic_force_density_tendon(Mesh):
+    """Compute the peridynamic force density
     :Mesh: TODO
     :returns: TODO
     """
@@ -247,12 +241,6 @@ def get_peridynamic_force_tendon(Mesh):
 
         # return nsum_force
         force[i,:] = nsum_force
-
-    ## parallel attempt: slow for small number of nodes
-    # a_pool = Pool()
-    # force = a_pool.map(one_row, range(total_nodes)) 
-    # force = np.array(force)
-    # print(force)
 
     return force
     
@@ -338,39 +326,30 @@ bottom_nbr = Mesh.NArr[Mesh.bottom_node]
 # print('Initial mean disp', np.mean(Mesh.disp, axis = 0))
 
 for t in range(timesteps):
-    # print('t', t)
-
-    # print('mean CurrPos', np.mean(Mesh.CurrPos, axis = 0))
-    # print('mean disp', np.mean(Mesh.disp, axis = 0))
-    # print('mean vel', np.mean(Mesh.vel, axis = 0))
-
     # initial update
     Mesh.disp += dt * Mesh.vel + (dt * dt * 0.5) * Mesh.acc
     Mesh.CurrPos = Mesh.pos + Mesh.disp
 
-    # print('after mean CurrPos', np.mean(Mesh.CurrPos, axis = 0))
-    # print('after mean disp', np.mean(Mesh.disp, axis = 0))
+    ### [Abandoned] compute force density
+    #Mesh.force = get_peridynamic_force_density(Mesh)
+    #Mesh.force += get_peridynamic_force_density_tendon(Mesh)
+    #P = get_pressure(Mesh)
+    ## convert force to force density
+    #Mesh.force += ( P.pforce / Mesh.vol)
 
-    ## compute force
-    Mesh.force = get_peridynamic_force(Mesh)
-
-    # print(force[Mesh.top_node,:])
-    # print(force[top_nbr,:])
-    # print(force[bottom_nbr,:])
-
-    Mesh.force += get_peridynamic_force_tendon(Mesh)
-
-    P = get_pressure(Mesh)
-    # convert force to force density
-    Mesh.force += ( P.pforce / Mesh.vol)
-    # Mesh.force += P.pforce
-    # print(P.CurrNormal)
+    ## [Full force, not the density] compute force instead of force density
+    Mesh.force = get_peridynamic_force_density(Mesh) * Mesh.vol
+    Mesh.force += (get_peridynamic_force_density_tendon(Mesh) * Mesh.len_t)
+    Mesh.force += get_pressure(Mesh).pforce
+    Mesh.force += Mesh.extforce
 
     if Mesh.allow_damping:
         Mesh.force -= Mesh.damping_coeff * Mesh.vel
 
-    # final update
-    Mesh.acc = (1 / Mesh.rho) * (Mesh.force + Mesh.extforce)
+    ## acceleration from force density
+    # Mesh.acc = (1 / Mesh.rho) * (Mesh.force + Mesh.extforce)
+    ## acceleration from force
+    Mesh.acc = (1 / Mesh.mass) * Mesh.force
     #	# velocity
     #	u0dot_univ{i} = uolddot_univ{i} + dt * 0.5 * uolddotdot_univ{i}
     #+ dt * 0.5 * u0dotdot_univ{i}; Mesh.vel = Mesh.vel  + (dt * 0.5)
