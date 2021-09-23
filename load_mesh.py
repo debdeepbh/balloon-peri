@@ -394,9 +394,13 @@ for t in range(timesteps):
         print('c', Mesh.plotcounter)
         filename = ('output/mesh_%05d.pkl' % Mesh.plotcounter)
         Mesh.save_state(filename)
-        Mesh.plotcounter += 1
+
+        with open('data/last_counter', 'w') as f:
+            f.write(str(Mesh.plotcounter))
 
         # save occasionally for resuming
-        if (Mesh.plotcounter % 5)==1:
+        if (Mesh.plotcounter % 5)==0:
             # save last 
             Mesh.save_state('savedata/Mesh_saved.pkl')
+
+        Mesh.plotcounter += 1
