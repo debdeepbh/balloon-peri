@@ -11,22 +11,23 @@ dt = 1e-4
 timesteps = 50000
 # timesteps = 1
 
-# resume = True
-resume = False
+resume = True
+# resume = False
 
 allow_damping = 0
 
-initial_perturbation = 1
+initial_position_modified = 1
 
 # plot properties
-# modulo = 50
-modulo = 100
+modulo = 50
+# modulo = 100
 
 
 if resume:
     # load Mesh
     Mesh = pickle.load( open( "savedata/Mesh_saved.pkl", "rb" ) )
     total_nodes = len(Mesh.pos)
+    z_0 = Mesh.pos[Mesh.bottom_node,2]
 else:
     # load Mesh
     Mesh = pickle.load( open( "data/Meshdump.pkl", "rb" ) )
@@ -41,6 +42,8 @@ else:
     Mesh.bottom_node = np.argmin(Mesh.pos[:,2])  
     Mesh.top_node = np.argmax(Mesh.pos[:,2])  
     #print('bottom node', Mesh.bottom_node)
+
+    # Mesh.pos_mod = copy.deepcopy(Mesh.pos)
 
     # z-value of the bottom of the balloon
     z_0 = Mesh.pos[Mesh.bottom_node,2]
@@ -174,7 +177,7 @@ else:
     # Mesh.disp += [0, 0, 0.5]
     # Mesh.disp[Mesh.top_node] += [0, 0, 0.5]
 
-    if initial_perturbation:
+    if initial_position_modified:
         for i in range(len(Mesh.pos)):
             param = 0.2
 
@@ -186,7 +189,32 @@ else:
                 norm_xy = 1
 
             unit_xy = pos_xy / norm_xy
-            Mesh.disp[i] = -(-pos_z**2/ (Mesh.rad**2) + 1) * param * Mesh.rad * np.array([unit_xy[0], unit_xy[1], 0])
+            
+            # parabolic perturbation inward
+            # rad = -Mesh.pos[Mesh.bottom_node,2]
+            # Mesh.disp[i] = -(-pos_z**2/ (rad**2) + 1) * param * rad * np.array([unit_xy[0], unit_xy[1], 0])
+
+            # perturbation such that bottom half is cosine
+            # rad = -Mesh.pos[Mesh.bottom_node,2]
+            # if pos_z < 0:
+                # target_radial_dist = rad/2 * np.cos( np.pi * pos_z/ rad) + rad/2
+                # target_pos =   np.array([target_radial_dist * unit_xy[0], target_radial_dist * unit_xy[1], pos_z])
+                # Mesh.pos_mod[i] =  target_pos
+
+            ## perturbation such that bottom half is linear
+            # rad = -Mesh.pos[Mesh.bottom_node,2]
+            # if pos_z < 0:
+                # target_radial_dist = pos_z + rad
+                # target_pos =   np.array([target_radial_dist * unit_xy[0], target_radial_dist * unit_xy[1], pos_z])
+                # Mesh.pos_mod[i] =  target_pos
+ 
+            ## shrink
+            norm_xyz = np.sqrt(np.sum(Mesh.pos[i]**2))
+            unit_xyz = Mesh.pos[i] / norm_xyz
+            ## initial displacement causes too much chaos
+            # Mesh.disp[i] = (-norm_xyz) * param * unit_xyz
+            ## modifying the position works as expected
+            Mesh.pos[i] -= norm_xyz * param * unit_xyz
 
 
     # Mesh.vel += [0, 0, 1]
@@ -354,6 +382,7 @@ for t in range(timesteps):
     # initial update
     Mesh.disp += dt * Mesh.vel + (dt * dt * 0.5) * Mesh.acc
     Mesh.CurrPos = Mesh.pos + Mesh.disp
+    # Mesh.CurrPos = Mesh.pos_mod + Mesh.disp
 
     ### [Abandoned] compute force density
     #Mesh.force = get_peridynamic_force_density(Mesh)

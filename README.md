@@ -48,13 +48,20 @@ python3 load_mesh.py
 python3 plot_steps.py
 ```
 
+# Notes
+
+## Modifying the initial configuration from sphere
+
+- One way is to change `Mesh.pos`, as long as the new position is not too stretched. Since this variable is only used to compute **all** the reference distances and surface area in the beginning, it can be modified.
+- Adding initial displacement `Mesh.disp` to strain the configuration produces large perturbation that breaks the simulation
+
 # Todo
 
-- [ ] Incorrect cnot in 2D; (correct expression for 2d constant `cnot` and `dt=1e-4` works)
+- [-] Incorrect cnot in 2D; (correct expression for 2d constant `cnot` and `dt=1e-4` works)
 - [x] `cnot_1d`: the constant and integrand do not match
 
 - [ ] Nodes on tendon
-	- [ ] What is the correct modulus to use for 1d peridynamics?
+	- [ ] What is the correct modulus to use for 1d peridynamics? `ETape`?
 	- [x] (Need to treat top and bottom nodes separately) Generate neighborhood for nodes on tendon
 	- [x] compute 1d peridynamic constant: $3 \lambda/ \delta^3$ where $\lambda$ is the Lame coefficient.
 	- [x] Implement 1-d peridynamics on tendon
