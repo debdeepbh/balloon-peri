@@ -117,6 +117,5 @@ if plot_bonds:
 
 
 # save
-import pickle 
-with open('data/Meshdump.pkl', 'wb') as config_dictionary_file:
-  pickle.dump(Mesh, config_dictionary_file)
+filename = 'data/Meshdump.pkl'
+Mesh.save_state(filename)

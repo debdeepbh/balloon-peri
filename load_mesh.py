@@ -4,8 +4,6 @@ import copy
 import matplotlib.pyplot as plt
 # from pathos.multiprocessing import ProcessingPool as Pool
 # from matplotlib.collections import LineCollection
-from mpl_toolkits.mplot3d import Axes3D
-from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
 
 # dt = 2e-2
 dt = 1e-1
@@ -20,16 +18,6 @@ allow_damping = 0
 # plot properties
 # modulo = 50
 modulo = 100
-# box_L = 1.5
-box_L = 50 * 1.5
-# print('dim, cam angle', dim,  camera_angle)
-camera_angle = [0, 0]
-
-plot_nodes = 0
-plot_nodes_on_tendon = 0
-dotsize = 0.5
-plot_mesh = 1
-linewidth=0.1
 
 
 if resume:
@@ -404,44 +392,11 @@ for t in range(timesteps):
     #plot
     if (t % modulo)==0:
         print('c', Mesh.plotcounter)
-        # Creating figure
-        # ax = plt.axes(projection ="3d")
-        fig = plt.figure()
-        ax = Axes3D(fig)
-        # Creating plot
-        if plot_nodes:
-            ax.scatter3D(Mesh.CurrPos[:,0],Mesh.CurrPos[:,1],Mesh.CurrPos[:,2], color='green', s=dotsize)
-        if plot_nodes_on_tendon:
-            ax.scatter3D(Mesh.CurrPos[Mesh.nodes_tendon,0],Mesh.CurrPos[Mesh.nodes_tendon,1],Mesh.CurrPos[Mesh.nodes_tendon,2], color='blue', s=dotsize)
-
-        if plot_mesh:
-            # debug
-            edges = Mesh.edges
-
-            V1 = edges[:,0]
-            V2 = edges[:,1]
-
-            P1 = Mesh.CurrPos[V1]
-            P2 = Mesh.CurrPos[V2]
-            ls =  [ [p1, p2] for p1, p2 in zip(P1,P2)] 
-            lc = Line3DCollection(ls, linewidths=linewidth, colors='b')
-            ax.add_collection(lc)
-
-        # f_norm = np.sqrt(np.sum(Mesh.force**2, axis=0))
-        # ax.scatter3D(Mesh.CurrPos[:,0],Mesh.CurrPos[:,1],Mesh.CurrPos[:,2], c=f_norm)
-        # ax.axis('equal')
-        ax.view_init(elev = camera_angle[0], azim = camera_angle[1])
-        ax.set_xlim3d(-box_L, box_L)
-        ax.set_ylim3d(-box_L, box_L)
-        ax.set_zlim3d(-box_L, box_L)
-        ax.set_box_aspect((1, 1, 1))
-        # plt.title("simple 3D scatter plot")
-        plt.savefig('img/tc_%05d.png' % Mesh.plotcounter, dpi=200, bbox_inches='tight')
-        # plt.show()
-        plt.close()
+        filename = ('output/mesh_%05d.pkl' % Mesh.plotcounter)
+        Mesh.save_state(filename)
         Mesh.plotcounter += 1
 
+        # save occasionally for resuming
         if (Mesh.plotcounter % 5)==1:
             # save last 
             Mesh.save_state('savedata/Mesh_saved.pkl')
-

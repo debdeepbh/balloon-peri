@@ -145,5 +145,7 @@ savedata/*
 !savedata/.gitkeep
 data/*
 !data/.gitkeep
+output/*
+!output/.gitkeep
 
 

@@ -7,6 +7,7 @@ import pickle
 
 # 3d plot
 from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
 # from mpl_toolkits import mplot3d
 
 import meshio
@@ -218,6 +219,63 @@ class ReturnValue(object):
 
         plt.show()
 
+    def saveplot(self, count):
+        """TODO: Docstring for plot_full.
+
+        :arg1: TODO
+        :returns: TODO
+
+        """
+
+        # box_L = 1.5
+        box_L = 50 * 1.5
+        # print('dim, cam angle', dim,  camera_angle)
+        camera_angle = [0, 0]
+
+        plot_nodes = 0
+        plot_nodes_on_tendon = 0
+        dotsize = 0.5
+        plot_mesh = 1
+        linewidth=0.1
+
+        print(self.plotcounter)
+        filename = ('img/tc_%05d.png' % self.plotcounter)
+
+        # Creating figure
+        # ax = plt.axes(projection ="3d")
+        fig = plt.figure()
+        ax = Axes3D(fig)
+        # Creating plot
+        if plot_nodes:
+            ax.scatter3D(self.CurrPos[:,0],self.CurrPos[:,1],self.CurrPos[:,2], color='green', s=dotsize)
+        if plot_nodes_on_tendon:
+            ax.scatter3D(self.CurrPos[self.nodes_tendon,0],self.CurrPos[self.nodes_tendon,1],self.CurrPos[self.nodes_tendon,2], color='blue', s=dotsize)
+
+        if plot_mesh:
+            # debug
+            edges = self.edges
+
+            V1 = edges[:,0]
+            V2 = edges[:,1]
+
+            P1 = self.CurrPos[V1]
+            P2 = self.CurrPos[V2]
+            ls =  [ [p1, p2] for p1, p2 in zip(P1,P2)] 
+            lc = Line3DCollection(ls, linewidths=linewidth, colors='b')
+            ax.add_collection(lc)
+
+        # f_norm = np.sqrt(np.sum(self.force**2, axis=0))
+        # ax.scatter3D(self.CurrPos[:,0],self.CurrPos[:,1],self.CurrPos[:,2], c=f_norm)
+        # ax.axis('equal')
+        ax.view_init(elev = camera_angle[0], azim = camera_angle[1])
+        ax.set_xlim3d(-box_L, box_L)
+        ax.set_ylim3d(-box_L, box_L)
+        ax.set_zlim3d(-box_L, box_L)
+        ax.set_box_aspect((1, 1, 1))
+        # plt.title("simple 3D scatter plot")
+        plt.savefig(filename, dpi=200, bbox_inches='tight')
+        # plt.show()
+        plt.close()
 
         
 # def genmesh(P_bdry, meshsize, pygmsh_geom=None, msh_file = None, do_plot = True, dimension = 2, dotsize = 10, mesh_optimize=True):
