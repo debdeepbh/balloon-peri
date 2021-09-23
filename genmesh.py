@@ -253,8 +253,8 @@ class ReturnValue(object):
         # box_L = 1.5
         box_L = 50 * 1.5
         # print('dim, cam angle', dim,  camera_angle)
-        # camera_angle = [0, 0]
-        camera_angle = [90, 0]
+        camera_angle = [0, 0]
+        # camera_angle = [90, 0]
 
         plot_nodes = 0
         plot_nodes_on_tendon = 0

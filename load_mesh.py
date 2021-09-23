@@ -5,8 +5,9 @@ import matplotlib.pyplot as plt
 # from pathos.multiprocessing import ProcessingPool as Pool
 # from matplotlib.collections import LineCollection
 
-# dt = 2e-2
-dt = 1e-1
+# dt = 2e-3
+# dt = 1e-1
+dt = 1e-4
 timesteps = 50000
 # timesteps = 1
 
@@ -54,24 +55,31 @@ else:
     LinDenT =0.015205 # kg/m	# linear density of the tendon
     ETape = 761560
     nu = 1/3
+    ethickness = 38.1e-06
+    # BalloonFilmWeightArealDensity = ethickness * 920 * gravity	# weight of the film per unit area
+    BalloonFilmMassArealDensity = ethickness * 920 
+
+    # 2d constant: from my granular paper
     cnot = 6*E/( np.pi * (Mesh.delta**3) * (1 - nu))
 
     damping_coeff = 10
 
     # division between 1e8:too stiff and 1e10:too loose
     Mesh.cnot = cnot
-    Mesh.cnot = cnot /1e3
+    # Mesh.cnot = cnot /1e3
     print('cnot', cnot)
 
-    thickness = 50e-6 # 0.05 mm
-    Mesh.rho = 920 # LDPE 920 kg/m^3
-    # Mesh.rho = 920 * thickness # LDPE 920 kg/m^3
+
+    # Mesh.rho = 920 # LDPE 920 kg/m^3
+    ## for 2d peridynamics, we want rho to be Mass/Area
+    Mesh.rho = BalloonFilmMassArealDensity
 
     # Is this the right unit to use?
     # Mesh.tendon_modulus = LinDenT
     Mesh.LinDenT = LinDenT
     Mesh.tendon_modulus = ETape
-    Mesh.cnot_tendon = 3 * Mesh.tendon_modulus / (Mesh.delta**3)
+    # Mesh.cnot_tendon = 3 * Mesh.tendon_modulus / (Mesh.delta**3)
+    Mesh.cnot_tendon = 2 * Mesh.tendon_modulus / (Mesh.delta**2)
 
     print('cnot_tendon', Mesh.cnot_tendon)
 
@@ -158,13 +166,6 @@ else:
             pass
             # print('is [] for', p,' and', q)
     print('Done')
-    # print(Mesh.NArr_tendon[0])
-    # print(Mesh.NArr_tendon[1])
-    # print('id')
-    # print(Mesh.tendon_id[0])
-    # print(Mesh.tendon_id[1])
-    # print(Mesh.xi_norm_tendon)
-
 
     ## Initial data
     # Mesh.disp += [0, 0, 0]
@@ -176,7 +177,13 @@ else:
     # Mesh.acc[Mesh.top_node] += [0, 0, 1e5]
     # Mesh.extforce += [0, 0, 0]
     ## gravity (not density anymore)
-    # Mesh.extforce += [0, 0, g_val * Mesh.mass]
+    Mesh.extforce = np.c_[
+            np.zeros(total_nodes),
+            np.zeros(total_nodes),
+            g_val * Mesh.mass
+            ]
+    # print(Mesh.extforce)
+
 
 def get_peridynamic_force_density(Mesh):
     """Compute the peridynamic force density
@@ -236,7 +243,7 @@ def get_peridynamic_force_density_tendon(Mesh):
             # check if dividing by zero
             # n_unit_dir = n_etapxi / n_etapxi_norm
             n_unit_dir = np.array([p/np for p,np in zip(n_etapxi , n_etapxi_norm)])
-            n_vol = Mesh.vol[nbrs]
+            n_vol = Mesh.len_t[nbrs]
             nsum_force = np.sum(Mesh.cnot_tendon * n_strain * n_unit_dir * n_vol, axis=0)
 
         # return nsum_force
