@@ -242,7 +242,7 @@ class ReturnValue(object):
 
         plt.show()
 
-    def saveplot(self, count):
+    def saveplot(self, count, show=False):
         """TODO: Docstring for plot_full.
 
         :arg1: TODO
@@ -253,7 +253,8 @@ class ReturnValue(object):
         # box_L = 1.5
         box_L = 50 * 1.5
         # print('dim, cam angle', dim,  camera_angle)
-        camera_angle = [0, 0]
+        # camera_angle = [0, 0]
+        camera_angle = [90, 0]
 
         plot_nodes = 0
         plot_nodes_on_tendon = 0
@@ -297,7 +298,8 @@ class ReturnValue(object):
         ax.set_box_aspect((1, 1, 1))
         # plt.title("simple 3D scatter plot")
         plt.savefig(filename, dpi=200, bbox_inches='tight')
-        # plt.show()
+        if show:
+            plt.show()
         plt.close()
 
         

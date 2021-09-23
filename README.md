@@ -49,13 +49,15 @@ python3 plot_steps.py
 ```
 
 # Todo
+
+- [ ] Incorrect cnot in 2D
+
 - [ ] Nodes on tendon
+	- [ ] What is the correct modulus to use for 1d peridynamics?
 	- [x] (Need to treat top and bottom nodes separately) Generate neighborhood for nodes on tendon
 	- [x] compute 1d peridynamic constant: $3 \lambda/ \delta^3$ where $\lambda$ is the Lame coefficient.
-	- [ ] What is the correct modulus to use for 1d peridynamics?
-	- [ ] Implement 1-d peridynamics on tendon
+	- [x] Implement 1-d peridynamics on tendon
 
-- [ ] take spring constant to be 2d plastic sheet
 
 - [x] Take reference length to be either the flat distance or the distance along the sphere.
 - [x] Spherical shell, generate nodes mesh in 3d
