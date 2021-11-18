@@ -2,7 +2,7 @@ import  numpy as np
 import pickle
 import copy
 import matplotlib.pyplot as plt
-# from pathos.multiprocessing import ProcessingPool as Pool
+from pathos.multiprocessing import ProcessingPool as Pool
 # from matplotlib.collections import LineCollection
 
 # dt = 2e-3
@@ -19,6 +19,8 @@ allow_damping = 0
 # plot properties
 # modulo = 50
 modulo = 100
+
+parallel = True
 
 
 if resume:
@@ -233,6 +235,15 @@ def get_peridynamic_force_density(Mesh):
 
     return force
 
+def outer_theta_i(n_CurrPos, CurrPos_i, n_xi_norm, n_vol):
+        n_etapxi = n_CurrPos - CurrPos_i
+        n_etapxi_norm =  np.sqrt(np.sum(n_etapxi**2, axis=1))
+        n_xi_norm = Mesh.xi_norm[i]
+        diff = n_etapxi_norm - n_xi_norm
+        # could be negative for compression
+        diff[diff < 0] = 0
+        return 3/mx * np.sum(diff * n_vol)
+
 def get_state_based_peridynamic_force_density(Mesh):
     """Compute the state-based peridynamic force density
     Assuming J=1
@@ -442,8 +453,8 @@ for t in range(timesteps):
     #Mesh.force += ( P.pforce / Mesh.vol)
 
     ## [Full force, not the density] compute force instead of force density
-    Mesh.force = get_state_based_peridynamic_force_density(Mesh) * Mesh.vol
-    # Mesh.force = get_peridynamic_force_density(Mesh) * Mesh.vol
+    # Mesh.force = get_state_based_peridynamic_force_density(Mesh) * Mesh.vol
+    Mesh.force = get_peridynamic_force_density(Mesh) * Mesh.vol
     # Mesh.force += (get_peridynamic_force_density_tendon(Mesh) * Mesh.len_t)
     Mesh.force += get_pressure(Mesh).pforce
     Mesh.force += Mesh.extforce
