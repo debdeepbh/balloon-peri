@@ -52,15 +52,27 @@ else:
 
     # E = 72e9
     E = 0.3e9 # Polyethylene (low density) LDPE 
+    # E = 0.23e9  # from Frank's constant
     LinDenT =0.015205 # kg/m	# linear density of the tendon
-    ETape = 761560
+    ETape = 761560  # tendon modulus
     nu = 1/3
+    # nu = 0.46   # polyethylene (high density) HDPE
+    # nu = 0.6265 # from Frank's constants
     ethickness = 38.1e-06
     # BalloonFilmWeightArealDensity = ethickness * 920 * gravity	# weight of the film per unit area
     BalloonFilmMassArealDensity = ethickness * 920 
 
+    # conversion
+    bulk_modulus = E / (3 * (1 - 2 * nu))
+    shear_modulus = E / (2 * (1 + nu))
+
     # 2d constant: from my granular paper
     cnot = 6*E/( np.pi * (Mesh.delta**3) * (1 - nu))
+    
+    # for state-based computation
+    mx = np.pi * (Mesh.delta**4) /2  # assuming J=1
+    C1 = 3 * bulk_modulus / mx - 15 * shear_modulus / (2 * mx)
+    C2 = 15 * shear_modulus / mx
 
     damping_coeff = 10
 
@@ -68,7 +80,6 @@ else:
     Mesh.cnot = cnot
     # Mesh.cnot = cnot /1e3
     print('cnot', cnot)
-
 
     # Mesh.rho = 920 # LDPE 920 kg/m^3
     ## for 2d peridynamics, we want rho to be Mass/Area
@@ -120,6 +131,8 @@ else:
     # print(Mesh.NArr)
     # print(Mesh.xi_norm)
 
+    Mesh.theta = np.zeros(total_nodes)
+
     # NbdArr for tendons
     print('Generating tendon connectivity')
     Mesh.NArr_tendon = []
@@ -165,7 +178,7 @@ else:
         else:
             pass
             # print('is [] for', p,' and', q)
-    print('Done')
+    print('Done generating tendon connectivity.')
 
     ## Initial data
     # Mesh.disp += [0, 0, 0]
@@ -217,6 +230,90 @@ def get_peridynamic_force_density(Mesh):
     # force = a_pool.map(one_row, range(total_nodes)) 
     # force = np.array(force)
     # print(force)
+
+    return force
+
+def get_state_based_peridynamic_force_density(Mesh):
+    """Compute the state-based peridynamic force density
+    Assuming J=1
+    :Mesh: TODO
+    :returns: TODO
+    """
+    force = np.zeros((total_nodes, 3))
+
+    # compute theta_x for all x
+    for i in range(total_nodes):
+        nbrs = Mesh.NArr[i]
+        n_etapxi = Mesh.CurrPos[nbrs] - Mesh.CurrPos[i]
+        n_etapxi_norm =  np.sqrt(np.sum(n_etapxi**2, axis=1))
+        n_xi_norm = Mesh.xi_norm[i]
+        n_vol = Mesh.vol[nbrs]
+        diff = n_etapxi_norm - n_xi_norm
+        # could be negative for compression
+        diff[diff < 0] = 0
+        Mesh.theta[i] = 3/mx * np.sum(diff * n_vol)
+
+    # compute all pairwise T_x(y); but T_x(y) != T_y(x)
+
+    ## create and clear every time
+    ## would be faster if we could create once and replace only
+    Mesh.TArr_diff = []
+    for i in range(len(Mesh.pos)):
+        Mesh.TArr_diff.append([])
+
+    for idx in range(len(Mesh.Conn)):
+        pair = Mesh.Conn[idx]
+        i = pair[0]
+        j = pair[1]
+        # check the correct direction
+        etapxi = Mesh.CurrPos[j] - Mesh.CurrPos[i]
+        etapxi_norm =  np.sqrt(np.sum(etapxi**2))
+        unit_dir = etapxi/etapxi_norm
+        xi_norm = Mesh.Conn_xi_norm[idx]
+        diff = etapxi_norm - xi_norm
+        # could be negative for compression
+        if (diff < 0):
+            diff = 0
+
+        ## Define T_ij := T_i(j)
+        # T_ij = (C1 * xi_norm * Mesh.theta[i]  + C2 * diff) * unit_dir
+        # T_ji = (C1 * xi_norm * Mesh.theta[j]  + C2 * diff) * (-unit_dir)
+        # T_diff = T_ij - T_ji
+        ## can combine 
+        T_diff = (C1 * xi_norm * (Mesh.theta[i] + Mesh.theta[j])  + 2 * C2 * diff) * unit_dir 
+
+        # T_diff = T_diff.tolist()
+
+        # Mesh.TArr[i].append(T_ij)
+        # Mesh.TArr[j].append(T_ji)
+
+        ## i-th row is {T_i(j) - T_j(i) : j in Nbd(i)}
+        ## j-th row is {T_j(i) - T_i(j) : i in Nbd(j)}
+        # Mesh.TArr_diff[i].append(T_diff)
+        # Mesh.TArr_diff[j].append(-T_diff)
+        Mesh.TArr_diff[i].append(T_diff)
+        Mesh.TArr_diff[j].append(-T_diff)
+
+    # for i in [0, 1]:
+        # # print(Mesh.NArr[i], test_NArr)
+        # print('i=',i, len(Mesh.NArr[i]),  len(Mesh.TArr_diff[i]))
+        # print(Mesh.NArr[i])
+        # print(Mesh.TArr_diff[i])
+    # print('Done computing TArr_diff')
+
+    # sum over neighbors
+    for i in range(total_nodes):
+        nbrs = Mesh.NArr[i]
+        n_vol = Mesh.vol[nbrs]
+        
+
+        n_T_diff = np.array(Mesh.TArr_diff[i])
+
+        # print(n_T_diff)
+        # print(n_vol)
+        # print('sizes', len(n_T_diff), len(n_vol))
+        nsum_force = np.sum( n_T_diff * n_vol, axis=0)
+        force[i,:] = nsum_force
 
     return force
 
@@ -345,8 +442,9 @@ for t in range(timesteps):
     #Mesh.force += ( P.pforce / Mesh.vol)
 
     ## [Full force, not the density] compute force instead of force density
-    Mesh.force = get_peridynamic_force_density(Mesh) * Mesh.vol
-    Mesh.force += (get_peridynamic_force_density_tendon(Mesh) * Mesh.len_t)
+    Mesh.force = get_state_based_peridynamic_force_density(Mesh) * Mesh.vol
+    # Mesh.force = get_peridynamic_force_density(Mesh) * Mesh.vol
+    # Mesh.force += (get_peridynamic_force_density_tendon(Mesh) * Mesh.len_t)
     Mesh.force += get_pressure(Mesh).pforce
     Mesh.force += Mesh.extforce
 

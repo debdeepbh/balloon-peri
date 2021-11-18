@@ -45,6 +45,9 @@ class ReturnValue(object):
         # self.Conn_xi = None
         self.Conn_xi_norm = None
 
+        self.TArr_diff = None
+        self.theta = None
+
         self.NArr = None
         # self.xi = None
         self.xi_norm = None
@@ -257,7 +260,7 @@ class ReturnValue(object):
         # camera_angle = [90, 0]
 
         plot_nodes = 0
-        plot_nodes_on_tendon = 0
+        plot_nodes_on_tendon = 1
         dotsize = 0.5
         plot_mesh = 1
         linewidth=0.1
@@ -273,7 +276,7 @@ class ReturnValue(object):
         if plot_nodes:
             ax.scatter3D(self.CurrPos[:,0],self.CurrPos[:,1],self.CurrPos[:,2], color='green', s=dotsize)
         if plot_nodes_on_tendon:
-            ax.scatter3D(self.CurrPos[self.nodes_tendon,0],self.CurrPos[self.nodes_tendon,1],self.CurrPos[self.nodes_tendon,2], color='blue', s=dotsize)
+            ax.scatter3D(self.CurrPos[self.nodes_tendon,0],self.CurrPos[self.nodes_tendon,1],self.CurrPos[self.nodes_tendon,2], color='green', s=dotsize)
 
         if plot_mesh:
             # debug

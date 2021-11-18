@@ -119,4 +119,5 @@ if plot_bonds:
 
 # save
 filename = 'data/Meshdump.pkl'
+print('Saving mesh and connectivity to:', filename)
 Mesh.save_state(filename)

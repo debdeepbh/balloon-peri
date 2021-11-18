@@ -19,12 +19,12 @@ pip3 install -r requirements.txt
 
 Full-size (150 m as half-diameter):
 ```
-mesh/3d_sphere_forloop_big.geo -2 
+gmsh mesh/3d_sphere_forloop_big.geo -2 
 ```
 
-Unit sphere with tendons on vertical planes
+**Unit sphere** with tendons on vertical planes 
 ```
-mesh/3d_sphere_forloop.geo -2
+gmsh mesh/3d_sphere_forloop.geo -2
 ```
 
 Old (don't use):
