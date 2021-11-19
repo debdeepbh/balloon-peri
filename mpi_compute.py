@@ -27,8 +27,6 @@ allow_damping = 0
 # modulo = 20
 modulo = 100
 
-# parallel = True
-parallel = False
 
 
 if resume:
@@ -271,25 +269,16 @@ def get_state_based_peridynamic_force_density(Mesh):
     """
     force = np.zeros((total_nodes, 3))
 
-    if parallel:
-        a_pool = Pool()
-        Mesh.CurrPosArr = a_pool.map(outer_CurrPosArr, range(total_nodes))
-
-    # compute theta_x for all x
-    if parallel:
-        a_pool = Pool()
-        Mesh.theta = a_pool.map(outer_theta_i, Mesh.CurrPosArr, Mesh.CurrPos, Mesh.xi_norm, Mesh.VolArr)
-    else:
-        for i in range(total_nodes):
-            nbrs = Mesh.NArr[i]
-            n_etapxi = Mesh.CurrPos[nbrs] - Mesh.CurrPos[i]
-            n_etapxi_norm =  np.sqrt(np.sum(n_etapxi**2, axis=1))
-            n_xi_norm = Mesh.xi_norm[i]
-            n_vol = Mesh.vol[nbrs]
-            diff = n_etapxi_norm - n_xi_norm
-            # could be negative for compression
-            diff[diff < 0] = 0
-            Mesh.theta[i] = 3/Mesh.mx * np.sum(diff * n_vol)
+    for i in range(total_nodes):
+        nbrs = Mesh.NArr[i]
+        n_etapxi = Mesh.CurrPos[nbrs] - Mesh.CurrPos[i]
+        n_etapxi_norm =  np.sqrt(np.sum(n_etapxi**2, axis=1))
+        n_xi_norm = Mesh.xi_norm[i]
+        n_vol = Mesh.vol[nbrs]
+        diff = n_etapxi_norm - n_xi_norm
+        # could be negative for compression
+        diff[diff < 0] = 0
+        Mesh.theta[i] = 3/Mesh.mx * np.sum(diff * n_vol)
 
     # print(Mesh.theta)
 
@@ -497,19 +486,27 @@ for t in range(timesteps):
 
     Mesh.force =  np.zeros((total_nodes,3))
 
-    Mesh.force += (get_state_based_peridynamic_force_density(Mesh) * Mesh.vol)
-    Mesh.force += (get_peridynamic_force_density_tendon(Mesh) * Mesh.len_t)
-    Mesh.force += get_pressure(Mesh).pforce
-    Mesh.force += Mesh.extforce
+    # Mesh.force += (get_state_based_peridynamic_force_density(Mesh) * Mesh.vol)
+    # Mesh.force += (get_peridynamic_force_density_tendon(Mesh) * Mesh.len_t)
+    # Mesh.force += get_pressure(Mesh).pforce
+    # Mesh.force += Mesh.extforce
+    # if Mesh.allow_damping:
+        # Mesh.force -= Mesh.damping_coeff * Mesh.vel
+
+    Mesh.force[rank::size] += (get_state_based_peridynamic_force_density(Mesh) * Mesh.vol)[rank::size]
+    Mesh.force[rank::size] += (get_peridynamic_force_density_tendon(Mesh) * Mesh.len_t)[rank::size]
+    Mesh.force[rank::size] += get_pressure(Mesh).pforce[rank::size]
+    Mesh.force[rank::size] += Mesh.extforce[rank::size]
     if Mesh.allow_damping:
-        Mesh.force -= Mesh.damping_coeff * Mesh.vel
+        Mesh.force[rank::size] -= Mesh.damping_coeff * Mesh.vel[rank::size]
+
     # for i in range(rank, total_nodes, size):    # mpi
-        # Force[i] += (get_state_based_peridynamic_force_density(Mesh) * Mesh.vol)[i]
-        # Force[i] += (get_peridynamic_force_density_tendon(Mesh) * Mesh.len_t)[i]
-        # Force[i] += get_pressure(Mesh).pforce[i]
-        # Force[i] += Mesh.extforce[i]
+        # Mesh.force[i] += (get_state_based_peridynamic_force_density(Mesh) * Mesh.vol)[i]
+        # Mesh.force[i] += (get_peridynamic_force_density_tendon(Mesh) * Mesh.len_t)[i]
+        # Mesh.force[i] += get_pressure(Mesh).pforce[i]
+        # Mesh.force[i] += Mesh.extforce[i]
         # if Mesh.allow_damping:
-            # Force[i] -= Mesh.damping_coeff * Mesh.vel[i]
+            # Mesh.force[i] -= Mesh.damping_coeff * Mesh.vel[i]
 
     # if rank==0:
         # print('before reduce', Mesh.force)
