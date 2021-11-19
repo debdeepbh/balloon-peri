@@ -205,12 +205,15 @@ else:
     # Mesh.acc[Mesh.top_node] += [0, 0, 1e5]
     # Mesh.extforce += [0, 0, 0]
     ## gravity (not density anymore)
-    Mesh.extforce = np.c_[
-            np.zeros(total_nodes),
-            np.zeros(total_nodes),
-            g_val * Mesh.mass
-            ]
-    # print(Mesh.extforce)
+
+    # Mesh.extforce = np.c_[
+            # np.zeros(total_nodes),
+            # np.zeros(total_nodes),
+            # g_val * Mesh.mass
+            # ]
+
+    for i in range(rank, total_nodes, size):    # mpi
+        Mesh.extforce[i,2] = g_val * Mesh.mass[i]
 
 
 def get_peridynamic_force_density(Mesh):
@@ -339,7 +342,8 @@ def get_state_based_peridynamic_force_density(Mesh):
     # print('Done computing TArr_diff')
 
     # sum over neighbors
-    for i in range(total_nodes):
+    # for i in range(total_nodes):
+    for i in range(rank, total_nodes, size):    # mpi
         nbrs = Mesh.NArr[i]
         n_vol = Mesh.vol[nbrs]
         
@@ -361,7 +365,8 @@ def get_peridynamic_force_density_tendon(Mesh):
     """
     force = np.zeros((total_nodes, 3))
 
-    for i in range(total_nodes):
+    # for i in range(total_nodes):
+    for i in range(rank, total_nodes, size):    # mpi
     # def one_row(i):
         nbrs = Mesh.NArr_tendon[i]
         nsum_force = 0
@@ -405,7 +410,8 @@ def get_pressure(Mesh):
     T = Mesh.T
     Pos = Mesh.CurrPos
 
-    for i in range(len(T)):
+    # for i in range(len(T)):
+    for i in range(rank, len(T), size):    # mpi
         # print('i', i)
         # print('T[i,0]', T[i,0])
         # print('T[i,1]', T[i,1])
@@ -497,8 +503,21 @@ for t in range(timesteps):
     Mesh.force += Mesh.extforce
     if Mesh.allow_damping:
         Mesh.force -= Mesh.damping_coeff * Mesh.vel
+    # for i in range(rank, total_nodes, size):    # mpi
+        # Force[i] += (get_state_based_peridynamic_force_density(Mesh) * Mesh.vol)[i]
+        # Force[i] += (get_peridynamic_force_density_tendon(Mesh) * Mesh.len_t)[i]
+        # Force[i] += get_pressure(Mesh).pforce[i]
+        # Force[i] += Mesh.extforce[i]
+        # if Mesh.allow_damping:
+            # Force[i] -= Mesh.damping_coeff * Mesh.vel[i]
 
-    comm.allreduce(Mesh.force, op=MPI.SUM)
+    # if rank==0:
+        # print('before reduce', Mesh.force)
+
+    comm.Allreduce(MPI.IN_PLACE, Mesh.force, op=MPI.SUM)
+
+    # if rank==0:
+        # print('after reduce', Mesh.force)
 
     ## acceleration from force density
     # Mesh.acc = (1 / Mesh.rho) * (Mesh.force + Mesh.extforce)
