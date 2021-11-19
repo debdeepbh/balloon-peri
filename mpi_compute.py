@@ -147,7 +147,7 @@ else:
     Mesh.theta = np.zeros(total_nodes)
 
     # NbdArr for tendons
-    print('Generating tendon connectivity', flush=True)
+    # print('Generating tendon connectivity', flush=True)
     Mesh.NArr_tendon = []
     Mesh.xi_norm_tendon = []
 
@@ -189,7 +189,7 @@ else:
         else:
             pass
             # print('is [] for', p,' and', q)
-    print('Done generating tendon connectivity.', flush=True)
+    # print('Done generating tendon connectivity.', flush=True)
 
     ## Initial data
     # Mesh.disp += [0, 0, 0]
