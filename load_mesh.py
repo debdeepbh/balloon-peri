@@ -1,6 +1,7 @@
 import  numpy as np
 import pickle
 import copy
+import time
 import matplotlib.pyplot as plt
 from pathos.multiprocessing import ProcessingPool as Pool
 # from matplotlib.collections import LineCollection
@@ -17,10 +18,11 @@ resume = False
 allow_damping = 0
 
 # plot properties
-# modulo = 50
+# modulo = 20
 modulo = 100
 
-parallel = True
+# parallel = True
+parallel = False
 
 
 if resume:
@@ -57,8 +59,8 @@ else:
     # E = 0.23e9  # from Frank's constant
     LinDenT =0.015205 # kg/m	# linear density of the tendon
     ETape = 761560  # tendon modulus
-    nu = 1/3
-    # nu = 0.46   # polyethylene (high density) HDPE
+    # nu = 1/3
+    nu = 0.46   # polyethylene (high density) HDPE
     # nu = 0.6265 # from Frank's constants
     ethickness = 38.1e-06
     # BalloonFilmWeightArealDensity = ethickness * 920 * gravity	# weight of the film per unit area
@@ -114,10 +116,12 @@ else:
     ## Connectivity to NbdArr
     print('Converting connectivity to NbdArr')
     Mesh.NArr = []
+    Mesh.VolArr = []
     # Mesh.xi = []
     Mesh.xi_norm = []
     for i in range(len(Mesh.pos)):
         Mesh.NArr.append([])
+        Mesh.VolArr.append([])
         Mesh.xi_norm.append([])
 
     for i in range(len(Mesh.Conn)):
@@ -127,6 +131,9 @@ else:
         d = Mesh.Conn_xi_norm[i]
         Mesh.NArr[p].append(q)
         Mesh.NArr[q].append(p)
+
+        Mesh.VolArr[p].append(Mesh.vol[q])
+        Mesh.VolArr[q].append(Mesh.vol[p])
 
         Mesh.xi_norm[p].append(d)
         Mesh.xi_norm[q].append(d)
@@ -235,14 +242,17 @@ def get_peridynamic_force_density(Mesh):
 
     return force
 
+def outer_CurrPosArr(i):
+    nbrs = Mesh.NArr[i]
+    return Mesh.CurrPos[nbrs]
+
 def outer_theta_i(n_CurrPos, CurrPos_i, n_xi_norm, n_vol):
         n_etapxi = n_CurrPos - CurrPos_i
         n_etapxi_norm =  np.sqrt(np.sum(n_etapxi**2, axis=1))
-        n_xi_norm = Mesh.xi_norm[i]
         diff = n_etapxi_norm - n_xi_norm
         # could be negative for compression
         diff[diff < 0] = 0
-        return 3/mx * np.sum(diff * n_vol)
+        return 3/mx*np.sum(diff * n_vol)
 
 def get_state_based_peridynamic_force_density(Mesh):
     """Compute the state-based peridynamic force density
@@ -252,17 +262,27 @@ def get_state_based_peridynamic_force_density(Mesh):
     """
     force = np.zeros((total_nodes, 3))
 
+    if parallel:
+        a_pool = Pool()
+        Mesh.CurrPosArr = a_pool.map(outer_CurrPosArr, range(total_nodes))
+
     # compute theta_x for all x
-    for i in range(total_nodes):
-        nbrs = Mesh.NArr[i]
-        n_etapxi = Mesh.CurrPos[nbrs] - Mesh.CurrPos[i]
-        n_etapxi_norm =  np.sqrt(np.sum(n_etapxi**2, axis=1))
-        n_xi_norm = Mesh.xi_norm[i]
-        n_vol = Mesh.vol[nbrs]
-        diff = n_etapxi_norm - n_xi_norm
-        # could be negative for compression
-        diff[diff < 0] = 0
-        Mesh.theta[i] = 3/mx * np.sum(diff * n_vol)
+    if parallel:
+        a_pool = Pool()
+        Mesh.theta = a_pool.map(outer_theta_i, Mesh.CurrPosArr, Mesh.CurrPos, Mesh.xi_norm, Mesh.VolArr)
+    else:
+        for i in range(total_nodes):
+            nbrs = Mesh.NArr[i]
+            n_etapxi = Mesh.CurrPos[nbrs] - Mesh.CurrPos[i]
+            n_etapxi_norm =  np.sqrt(np.sum(n_etapxi**2, axis=1))
+            n_xi_norm = Mesh.xi_norm[i]
+            n_vol = Mesh.vol[nbrs]
+            diff = n_etapxi_norm - n_xi_norm
+            # could be negative for compression
+            diff[diff < 0] = 0
+            Mesh.theta[i] = 3/mx * np.sum(diff * n_vol)
+
+    # print(Mesh.theta)
 
     # compute all pairwise T_x(y); but T_x(y) != T_y(x)
 
@@ -440,6 +460,7 @@ bottom_nbr = Mesh.NArr[Mesh.bottom_node]
 
 # print('Initial mean disp', np.mean(Mesh.disp, axis = 0))
 
+start_time = time.time()
 for t in range(timesteps):
     # initial update
     Mesh.disp += dt * Mesh.vel + (dt * dt * 0.5) * Mesh.acc
@@ -453,9 +474,9 @@ for t in range(timesteps):
     #Mesh.force += ( P.pforce / Mesh.vol)
 
     ## [Full force, not the density] compute force instead of force density
-    # Mesh.force = get_state_based_peridynamic_force_density(Mesh) * Mesh.vol
-    Mesh.force = get_peridynamic_force_density(Mesh) * Mesh.vol
-    # Mesh.force += (get_peridynamic_force_density_tendon(Mesh) * Mesh.len_t)
+    Mesh.force = get_state_based_peridynamic_force_density(Mesh) * Mesh.vol
+    # Mesh.force = get_peridynamic_force_density(Mesh) * Mesh.vol
+    Mesh.force += (get_peridynamic_force_density_tendon(Mesh) * Mesh.len_t)
     Mesh.force += get_pressure(Mesh).pforce
     Mesh.force += Mesh.extforce
 
@@ -497,5 +518,8 @@ for t in range(timesteps):
         if (Mesh.plotcounter % 5)==0:
             # save last 
             Mesh.save_state('savedata/Mesh_saved.pkl')
+
+        print("--- %s seconds ---" % (time.time() - start_time))
+        start_time = time.time()
 
         Mesh.plotcounter += 1

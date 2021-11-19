@@ -49,6 +49,8 @@ class ReturnValue(object):
         self.theta = None
 
         self.NArr = None
+        self.VolArr = None
+        self.CurrPosArr = None
         # self.xi = None
         self.xi_norm = None
 
