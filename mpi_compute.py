@@ -6,6 +6,12 @@ import matplotlib.pyplot as plt
 from pathos.multiprocessing import ProcessingPool as Pool
 # from matplotlib.collections import LineCollection
 
+from mpi4py import MPI
+comm = MPI.COMM_WORLD
+size = comm.Get_size()
+rank = comm.Get_rank()
+print('rank', rank, flush=True)
+
 # dt = 2e-3
 # dt = 1e-1
 dt = 1e-4
@@ -37,7 +43,7 @@ else:
     Mesh.vel =  np.zeros((total_nodes,3))
     Mesh.acc =  np.zeros((total_nodes,3))
     Mesh.extforce =  np.zeros((total_nodes,3))
-    Mesh.CurrPos = np.zeros((total_nodes,3))
+    # Mesh.CurrPos = np.zeros((total_nodes,3))
     Mesh.force =  np.zeros((total_nodes,3))
 
     Mesh.bottom_node = np.argmin(Mesh.pos[:,2])  
@@ -460,11 +466,10 @@ bottom_nbr = Mesh.NArr[Mesh.bottom_node]
 
 # print('Initial mean disp', np.mean(Mesh.disp, axis = 0))
 
+Mesh.CurrPos = Mesh.pos + Mesh.disp
+
 start_time = time.time()
 for t in range(timesteps):
-    # initial update
-    Mesh.disp += dt * Mesh.vel + (dt * dt * 0.5) * Mesh.acc
-    Mesh.CurrPos = Mesh.pos + Mesh.disp
 
     ### [Abandoned] compute force density
     #Mesh.force = get_peridynamic_force_density(Mesh)
@@ -474,15 +479,26 @@ for t in range(timesteps):
     #Mesh.force += ( P.pforce / Mesh.vol)
 
     ## [Full force, not the density] compute force instead of force density
-    Mesh.force = get_state_based_peridynamic_force_density(Mesh) * Mesh.vol
+    # Mesh.force = get_state_based_peridynamic_force_density(Mesh) * Mesh.vol
     # Mesh.force = Mesh.get_state_based_peridynamic_force_density() * Mesh.vol
     # Mesh.force = get_peridynamic_force_density(Mesh) * Mesh.vol
+
+    # Mesh.force += (get_peridynamic_force_density_tendon(Mesh) * Mesh.len_t)
+    # Mesh.force += get_pressure(Mesh).pforce
+    # Mesh.force += Mesh.extforce
+    # if Mesh.allow_damping:
+        # Mesh.force -= Mesh.damping_coeff * Mesh.vel
+
+    Mesh.force =  np.zeros((total_nodes,3))
+
+    Mesh.force += (get_state_based_peridynamic_force_density(Mesh) * Mesh.vol)
     Mesh.force += (get_peridynamic_force_density_tendon(Mesh) * Mesh.len_t)
     Mesh.force += get_pressure(Mesh).pforce
     Mesh.force += Mesh.extforce
-
     if Mesh.allow_damping:
         Mesh.force -= Mesh.damping_coeff * Mesh.vel
+
+    comm.allreduce(Mesh.force, op=MPI.SUM)
 
     ## acceleration from force density
     # Mesh.acc = (1 / Mesh.rho) * (Mesh.force + Mesh.extforce)
@@ -498,6 +514,9 @@ for t in range(timesteps):
     temp_acc *= (0.5 * dt) # now temp_acc = (dt*0.5) *(acc + acc_old)
     Mesh.vel += temp_acc
 
+    # initial update
+    Mesh.disp += dt * Mesh.vel + (dt * dt * 0.5) * Mesh.acc
+    Mesh.CurrPos = Mesh.pos + Mesh.disp
 
     # clamped node
     for i in range(len(Mesh.clamped_nodes)):
@@ -508,19 +527,20 @@ for t in range(timesteps):
 
     #plot
     if (t % modulo)==0:
-        print('c', Mesh.plotcounter)
-        filename = ('output/mesh_%05d.pkl' % Mesh.plotcounter)
-        Mesh.save_state(filename)
+        if rank == 0:
+            print('c', Mesh.plotcounter)
+            print("--- %s seconds ---" % (time.time() - start_time), flush=True)
+            filename = ('output/mesh_%05d.pkl' % Mesh.plotcounter)
+            Mesh.save_state(filename)
 
-        with open('data/last_counter', 'w') as f:
-            f.write(str(Mesh.plotcounter))
+            with open('data/last_counter', 'w') as f:
+                f.write(str(Mesh.plotcounter))
 
-        # save occasionally for resuming
-        if (Mesh.plotcounter % 5)==0:
-            # save last 
-            Mesh.save_state('savedata/Mesh_saved.pkl')
+            # save occasionally for resuming
+            if (Mesh.plotcounter % 5)==0:
+                # save last 
+                Mesh.save_state('savedata/Mesh_saved.pkl')
 
-        print("--- %s seconds ---" % (time.time() - start_time))
         start_time = time.time()
 
         Mesh.plotcounter += 1

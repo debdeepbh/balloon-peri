@@ -48,6 +48,20 @@ python3 load_mesh.py
 python3 plot_steps.py
 ```
 
+# MPI
+
+- Install 
+
+```
+pip3 install mpi4py
+```
+
+- Run
+
+```
+mpiexec -np 4 python3 mpi_compute.py
+```
+
 # Todo
 
 - [ ] Incorrect cnot in 2D; (correct expression for 2d constant `cnot` and `dt=1e-4` works)

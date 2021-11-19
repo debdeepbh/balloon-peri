@@ -2,6 +2,8 @@ import pygmsh
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
+# from pathos.multiprocessing import ProcessingPool as Pool
+from multiprocessing import Pool
 
 # import optimesh
 
@@ -35,24 +37,25 @@ class ReturnValue(object):
         self.zero_l_nodes = None
 
         self.pos = pos
+        self.total_nodes = len(pos)
         self.vol = vol
         self.T = T
         self.edges = edges
 
         self.bdry_nodes = bdry_nodes
 
-        self.Conn = None
+        self.Conn = []
         # self.Conn_xi = None
-        self.Conn_xi_norm = None
+        self.Conn_xi_norm = []
 
-        self.TArr_diff = None
-        self.theta = None
+        self.TArr_diff = []
+        self.theta = []
 
-        self.NArr = None
-        self.VolArr = None
-        self.CurrPosArr = None
+        self.NArr = []
+        self.VolArr = []
+        self.CurrPosArr = []
         # self.xi = None
-        self.xi_norm = None
+        self.xi_norm = []
 
         # for tendons
         self.rad = None
@@ -63,16 +66,16 @@ class ReturnValue(object):
         self.tendon_id = None
         # self.Conn_tendon = None
         # self.Conn_xi_norm_tendon = None
-        self.NArr_tendon = None
-        self.xi_norm_tendon = None
+        self.NArr_tendon = []
+        self.xi_norm_tendon = []
         
         self.disp = None
         self.vel = None
         self.acc = None
         self.extforce = None
 
-        self.force = None
-        self.CurrPos = None
+        self.force = []
+        self.CurrPos = []
 
         # material properties
         self.delta = None
@@ -91,6 +94,140 @@ class ReturnValue(object):
 
         # plot related
         self.plotcounter = 1
+
+        self.mx = 0
+        self.C1 = 0
+        self.C2 = 0
+
+        self.parallel = None
+
+        # initialize with empty
+        for i in range(self.total_nodes):
+            self.NArr.append([])
+            self.VolArr.append([])
+            self.CurrPosArr.append([])
+            self.xi_norm.append([])
+            self.NArr_tendon.append([])
+            self.xi_norm_tendon.append([])
+            self.TArr_diff.append([])
+
+
+    
+    def outer_CurrPosArr(self, i):
+        nbrs = self.NArr[i]
+        return self.CurrPos[nbrs]
+
+    def outer_theta_i(self,i):
+            nbrs = self.NArr[i]
+            n_etapxi = self.CurrPos[nbrs] - self.CurrPos[i]
+            n_etapxi_norm =  np.sqrt(np.sum(n_etapxi**2, axis=1))
+            n_xi_norm = self.xi_norm[i]
+            n_vol = self.vol[nbrs]
+            diff = n_etapxi_norm - n_xi_norm
+            # could be negative for compression
+            diff[diff < 0] = 0
+            return  3/self.mx * np.sum(diff * n_vol)
+
+    def get_state_based_peridynamic_force_density(self):
+        """Compute the state-based peridynamic force density
+        Assuming J=1
+        :Mesh: TODO
+        :returns: TODO
+        """
+        force = np.zeros((self.total_nodes, 3))
+
+
+        a_pool = Pool()
+        # self.parallel = True 
+        # self.parallel = False
+
+
+        print('self.parallel', self.parallel)
+        if self.parallel:
+            # self.CurrPosArr = a_pool.amap(self.outer_CurrPosArr, range(self.total_nodes)).get()
+            self.CurrPosArr = a_pool.map(self.outer_CurrPosArr, range(self.total_nodes))
+        else:
+            for i in range(self.total_nodes):
+                self.CurrPosArr[i].append(self.CurrPos[self.NArr[i]])
+
+        print(self.CurrPosArr[0])
+
+        # compute theta_x for all x
+        if self.parallel:
+            self.theta = a_pool.map(self.outer_theta_i, range(self.total_nodes))
+        else:
+            for i in range(self.total_nodes):
+                nbrs = self.NArr[i]
+                n_etapxi = self.CurrPos[nbrs] - self.CurrPos[i]
+                n_etapxi_norm =  np.sqrt(np.sum(n_etapxi**2, axis=1))
+                n_xi_norm = self.xi_norm[i]
+                n_vol = self.vol[nbrs]
+                diff = n_etapxi_norm - n_xi_norm
+                # could be negative for compression
+                diff[diff < 0] = 0
+                self.theta[i] = 3/self.mx * np.sum(diff * n_vol)
+
+        ## create and clear every time
+        self.TArr_diff = []
+        for i in range(self.total_nodes):
+            self.TArr_diff.append([])
+
+        ## would be faster if we could create once and replace only
+        for idx in range(len(self.Conn)):
+            pair = self.Conn[idx]
+            i = pair[0]
+            j = pair[1]
+            # check the correct direction
+            etapxi = self.CurrPos[j] - self.CurrPos[i]
+            etapxi_norm =  np.sqrt(np.sum(etapxi**2))
+            unit_dir = etapxi/etapxi_norm
+            xi_norm = self.Conn_xi_norm[idx]
+            diff = etapxi_norm - xi_norm
+            # could be negative for compression
+            if (diff < 0):
+                diff = 0
+
+            ## Define T_ij := T_i(j)
+            # T_ij = (C1 * xi_norm * self.theta[i]  + C2 * diff) * unit_dir
+            # T_ji = (C1 * xi_norm * self.theta[j]  + C2 * diff) * (-unit_dir)
+            # T_diff = T_ij - T_ji
+            ## can combine 
+            T_diff = (self.C1 * xi_norm * (self.theta[i] + self.theta[j])  + 2 * self.C2 * diff) * unit_dir 
+
+            # T_diff = T_diff.tolist()
+
+            # self.TArr[i].append(T_ij)
+            # self.TArr[j].append(T_ji)
+
+            ## i-th row is {T_i(j) - T_j(i) : j in Nbd(i)}
+            ## j-th row is {T_j(i) - T_i(j) : i in Nbd(j)}
+            # self.TArr_diff[i].append(T_diff)
+            # self.TArr_diff[j].append(-T_diff)
+            self.TArr_diff[i].append(T_diff)
+            self.TArr_diff[j].append(-T_diff)
+
+        # for i in [0, 1]:
+            # # print(self.NArr[i], test_NArr)
+            # print('i=',i, len(self.NArr[i]),  len(self.TArr_diff[i]))
+            # print(self.NArr[i])
+            # print(self.TArr_diff[i])
+        # print('Done computing TArr_diff')
+
+        # sum over neighbors
+        for i in range(self.total_nodes):
+            nbrs = self.NArr[i]
+            n_vol = self.vol[nbrs]
+            
+
+            n_T_diff = np.array(self.TArr_diff[i])
+
+            # print(n_T_diff)
+            # print(n_vol)
+            # print('sizes', len(n_T_diff), len(n_vol))
+            nsum_force = np.sum( n_T_diff * n_vol, axis=0)
+            force[i,:] = nsum_force
+
+        return force
 
     def gen_nodes_on_tendon(self):
         """Generates a list of nodes which are on the tendon
