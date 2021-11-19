@@ -1,9 +1,16 @@
 import  numpy as np
 import pickle
 import copy
+import time
 import matplotlib.pyplot as plt
 from pathos.multiprocessing import ProcessingPool as Pool
 # from matplotlib.collections import LineCollection
+
+from mpi4py import MPI
+comm = MPI.COMM_WORLD
+size = comm.Get_size()
+rank = comm.Get_rank()
+print('rank', rank, flush=True)
 
 # dt = 2e-3
 # dt = 1e-1
@@ -17,11 +24,9 @@ resume = False
 allow_damping = 0
 
 # plot properties
-# modulo = 50
+# modulo = 20
 modulo = 100
 
-# parallel = True
-parallel = False
 
 
 if resume:
@@ -36,16 +41,14 @@ else:
     Mesh.vel =  np.zeros((total_nodes,3))
     Mesh.acc =  np.zeros((total_nodes,3))
     Mesh.extforce =  np.zeros((total_nodes,3))
-    Mesh.CurrPos = np.zeros((total_nodes,3))
+    # Mesh.CurrPos = np.zeros((total_nodes,3))
     Mesh.force =  np.zeros((total_nodes,3))
 
     Mesh.bottom_node = np.argmin(Mesh.pos[:,2])  
     Mesh.top_node = np.argmax(Mesh.pos[:,2])  
-    #print('bottom node', Mesh.bottom_node)
 
     # z-value of the bottom of the balloon
     z_0 = Mesh.pos[Mesh.bottom_node,2]
-    # print('z_0', z_0)
 
     # nodes to clamp
     # clamped_nodes = []
@@ -73,16 +76,15 @@ else:
     cnot = 6*E/( np.pi * (Mesh.delta**3) * (1 - nu))
     
     # for state-based computation
-    mx = np.pi * (Mesh.delta**4) /2  # assuming J=1
-    C1 = 3 * bulk_modulus / mx - 15 * shear_modulus / (2 * mx)
-    C2 = 15 * shear_modulus / mx
+    Mesh.mx = np.pi * (Mesh.delta**4) /2  # assuming J=1
+    Mesh.C1 = 3 * bulk_modulus / Mesh.mx - 15 * shear_modulus / (2 * Mesh.mx)
+    Mesh.C2 = 15 * shear_modulus / Mesh.mx
 
     damping_coeff = 10
 
     # division between 1e8:too stiff and 1e10:too loose
     Mesh.cnot = cnot
     # Mesh.cnot = cnot /1e3
-    print('cnot', cnot)
 
     # Mesh.rho = 920 # LDPE 920 kg/m^3
     ## for 2d peridynamics, we want rho to be Mass/Area
@@ -95,7 +97,6 @@ else:
     # Mesh.cnot_tendon = 3 * Mesh.tendon_modulus / (Mesh.delta**3)
     Mesh.cnot_tendon = 2 * Mesh.tendon_modulus / (Mesh.delta**2)
 
-    print('cnot_tendon', Mesh.cnot_tendon)
 
     # mass of the nodes
     Mesh.mass = Mesh.rho * Mesh.vol + Mesh.LinDenT * Mesh.len_t
@@ -112,13 +113,21 @@ else:
     Mesh.b = 0.104314581941182
     Mesh.pnot = 1
 
+    if rank==0:
+        print('cnot', cnot)
+        print('cnot_tendon', Mesh.cnot_tendon)
+        print('top nodes', Mesh.top_node)
+        print('bottom nodes', Mesh.bottom_node)
+        print('Converting connectivity to NbdArr')
+
     ## Connectivity to NbdArr
-    print('Converting connectivity to NbdArr')
     Mesh.NArr = []
+    Mesh.VolArr = []
     # Mesh.xi = []
     Mesh.xi_norm = []
     for i in range(len(Mesh.pos)):
         Mesh.NArr.append([])
+        Mesh.VolArr.append([])
         Mesh.xi_norm.append([])
 
     for i in range(len(Mesh.Conn)):
@@ -129,20 +138,19 @@ else:
         Mesh.NArr[p].append(q)
         Mesh.NArr[q].append(p)
 
+        Mesh.VolArr[p].append(Mesh.vol[q])
+        Mesh.VolArr[q].append(Mesh.vol[p])
+
         Mesh.xi_norm[p].append(d)
         Mesh.xi_norm[q].append(d)
-    # print(Mesh.NArr)
-    # print(Mesh.xi_norm)
 
     Mesh.theta = np.zeros(total_nodes)
 
     # NbdArr for tendons
-    print('Generating tendon connectivity')
+    print('Generating tendon connectivity', flush=True)
     Mesh.NArr_tendon = []
     Mesh.xi_norm_tendon = []
 
-    print('top nodes', Mesh.top_node)
-    print('bottom nodes', Mesh.bottom_node)
 
     for i in range(len(Mesh.pos)):
         Mesh.NArr_tendon.append([])
@@ -181,7 +189,7 @@ else:
         else:
             pass
             # print('is [] for', p,' and', q)
-    print('Done generating tendon connectivity.')
+    print('Done generating tendon connectivity.', flush=True)
 
     ## Initial data
     # Mesh.disp += [0, 0, 0]
@@ -193,12 +201,15 @@ else:
     # Mesh.acc[Mesh.top_node] += [0, 0, 1e5]
     # Mesh.extforce += [0, 0, 0]
     ## gravity (not density anymore)
-    Mesh.extforce = np.c_[
-            np.zeros(total_nodes),
-            np.zeros(total_nodes),
-            g_val * Mesh.mass
-            ]
-    # print(Mesh.extforce)
+
+    # Mesh.extforce = np.c_[
+            # np.zeros(total_nodes),
+            # np.zeros(total_nodes),
+            # g_val * Mesh.mass
+            # ]
+
+    for i in range(rank, total_nodes, size):    # mpi
+        Mesh.extforce[i,2] = g_val * Mesh.mass[i]
 
 
 def get_peridynamic_force_density(Mesh):
@@ -208,7 +219,8 @@ def get_peridynamic_force_density(Mesh):
     """
     force = np.zeros((total_nodes, 3))
 
-    for i in range(total_nodes):
+    # for i in range(total_nodes):
+    for i in range(rank, total_nodes, size):    # mpi
     # def one_row(i):
         nbrs = Mesh.NArr[i]
 
@@ -236,14 +248,17 @@ def get_peridynamic_force_density(Mesh):
 
     return force
 
+def outer_CurrPosArr(i):
+    nbrs = Mesh.NArr[i]
+    return Mesh.CurrPos[nbrs]
+
 def outer_theta_i(n_CurrPos, CurrPos_i, n_xi_norm, n_vol):
         n_etapxi = n_CurrPos - CurrPos_i
         n_etapxi_norm =  np.sqrt(np.sum(n_etapxi**2, axis=1))
-        n_xi_norm = Mesh.xi_norm[i]
         diff = n_etapxi_norm - n_xi_norm
         # could be negative for compression
         diff[diff < 0] = 0
-        return 3/mx * np.sum(diff * n_vol)
+        return 3/ax*np.sum(diff * n_vol)
 
 def get_state_based_peridynamic_force_density(Mesh):
     """Compute the state-based peridynamic force density
@@ -253,7 +268,6 @@ def get_state_based_peridynamic_force_density(Mesh):
     """
     force = np.zeros((total_nodes, 3))
 
-    # compute theta_x for all x
     for i in range(total_nodes):
         nbrs = Mesh.NArr[i]
         n_etapxi = Mesh.CurrPos[nbrs] - Mesh.CurrPos[i]
@@ -263,7 +277,7 @@ def get_state_based_peridynamic_force_density(Mesh):
         diff = n_etapxi_norm - n_xi_norm
         # could be negative for compression
         diff[diff < 0] = 0
-        Mesh.theta[i] = 3/mx * np.sum(diff * n_vol)
+        Mesh.theta[i] = 3/Mesh.mx * np.sum(diff * n_vol)
 
     # compute all pairwise T_x(y); but T_x(y) != T_y(x)
 
@@ -292,7 +306,7 @@ def get_state_based_peridynamic_force_density(Mesh):
         # T_ji = (C1 * xi_norm * Mesh.theta[j]  + C2 * diff) * (-unit_dir)
         # T_diff = T_ij - T_ji
         ## can combine 
-        T_diff = (C1 * xi_norm * (Mesh.theta[i] + Mesh.theta[j])  + 2 * C2 * diff) * unit_dir 
+        T_diff = (Mesh.C1 * xi_norm * (Mesh.theta[i] + Mesh.theta[j])  + 2 * Mesh.C2 * diff) * unit_dir 
 
         # T_diff = T_diff.tolist()
 
@@ -314,7 +328,8 @@ def get_state_based_peridynamic_force_density(Mesh):
     # print('Done computing TArr_diff')
 
     # sum over neighbors
-    for i in range(total_nodes):
+    # for i in range(total_nodes):
+    for i in range(rank, total_nodes, size):    # mpi
         nbrs = Mesh.NArr[i]
         n_vol = Mesh.vol[nbrs]
         
@@ -336,7 +351,8 @@ def get_peridynamic_force_density_tendon(Mesh):
     """
     force = np.zeros((total_nodes, 3))
 
-    for i in range(total_nodes):
+    # for i in range(total_nodes):
+    for i in range(rank, total_nodes, size):    # mpi
     # def one_row(i):
         nbrs = Mesh.NArr_tendon[i]
         nsum_force = 0
@@ -380,7 +396,8 @@ def get_pressure(Mesh):
     T = Mesh.T
     Pos = Mesh.CurrPos
 
-    for i in range(len(T)):
+    # for i in range(len(T)):
+    for i in range(rank, len(T), size):    # mpi
         # print('i', i)
         # print('T[i,0]', T[i,0])
         # print('T[i,1]', T[i,1])
@@ -441,10 +458,10 @@ bottom_nbr = Mesh.NArr[Mesh.bottom_node]
 
 # print('Initial mean disp', np.mean(Mesh.disp, axis = 0))
 
+Mesh.CurrPos = Mesh.pos + Mesh.disp
+
+start_time = time.time()
 for t in range(timesteps):
-    # initial update
-    Mesh.disp += dt * Mesh.vel + (dt * dt * 0.5) * Mesh.acc
-    Mesh.CurrPos = Mesh.pos + Mesh.disp
 
     ### [Abandoned] compute force density
     #Mesh.force = get_peridynamic_force_density(Mesh)
@@ -455,13 +472,44 @@ for t in range(timesteps):
 
     ## [Full force, not the density] compute force instead of force density
     # Mesh.force = get_state_based_peridynamic_force_density(Mesh) * Mesh.vol
-    Mesh.force = get_peridynamic_force_density(Mesh) * Mesh.vol
+    # Mesh.force = Mesh.get_state_based_peridynamic_force_density() * Mesh.vol
+    # Mesh.force = get_peridynamic_force_density(Mesh) * Mesh.vol
+
     # Mesh.force += (get_peridynamic_force_density_tendon(Mesh) * Mesh.len_t)
+    # Mesh.force += get_pressure(Mesh).pforce
+    # Mesh.force += Mesh.extforce
+    # if Mesh.allow_damping:
+        # Mesh.force -= Mesh.damping_coeff * Mesh.vel
+
+    Mesh.force =  np.zeros((total_nodes,3))
+
+    Mesh.force += (get_state_based_peridynamic_force_density(Mesh) * Mesh.vol)
+    # Mesh.force += (get_peridynamic_force_density(Mesh) * Mesh.vol)
+    Mesh.force += (get_peridynamic_force_density_tendon(Mesh) * Mesh.len_t)
     Mesh.force += get_pressure(Mesh).pforce
     Mesh.force += Mesh.extforce
-
     if Mesh.allow_damping:
         Mesh.force -= Mesh.damping_coeff * Mesh.vel
+
+    ## Caution: Error exists here (also takes longer. Why??)
+    # Mesh.force[rank::size] += (get_state_based_peridynamic_force_density(Mesh) * Mesh.vol)[rank::size]
+    # Mesh.force[rank::size] += (get_peridynamic_force_density(Mesh) * Mesh.vol)[rank::size]
+    # Mesh.force[rank::size] += (get_peridynamic_force_density_tendon(Mesh) * Mesh.len_t)[rank::size]
+    # Mesh.force[rank::size] += get_pressure(Mesh).pforce[rank::size]
+    # Mesh.force[rank::size] += Mesh.extforce[rank::size]
+    # if Mesh.allow_damping:
+        # Mesh.force[rank::size] -= Mesh.damping_coeff * Mesh.vel[rank::size]
+
+    ## Too slow (why??!!)
+    # for i in range(rank, total_nodes, size):    # mpi
+        # Mesh.force[i] += (get_state_based_peridynamic_force_density(Mesh) * Mesh.vol)[i]
+        # Mesh.force[i] += (get_peridynamic_force_density_tendon(Mesh) * Mesh.len_t)[i]
+        # Mesh.force[i] += get_pressure(Mesh).pforce[i]
+        # Mesh.force[i] += Mesh.extforce[i]
+        # if Mesh.allow_damping:
+            # Mesh.force[i] -= Mesh.damping_coeff * Mesh.vel[i]
+
+    comm.Allreduce(MPI.IN_PLACE, Mesh.force, op=MPI.SUM)
 
     ## acceleration from force density
     # Mesh.acc = (1 / Mesh.rho) * (Mesh.force + Mesh.extforce)
@@ -477,6 +525,9 @@ for t in range(timesteps):
     temp_acc *= (0.5 * dt) # now temp_acc = (dt*0.5) *(acc + acc_old)
     Mesh.vel += temp_acc
 
+    # initial update
+    Mesh.disp += dt * Mesh.vel + (dt * dt * 0.5) * Mesh.acc
+    Mesh.CurrPos = Mesh.pos + Mesh.disp
 
     # clamped node
     for i in range(len(Mesh.clamped_nodes)):
@@ -487,16 +538,20 @@ for t in range(timesteps):
 
     #plot
     if (t % modulo)==0:
-        print('c', Mesh.plotcounter)
-        filename = ('output/mesh_%05d.pkl' % Mesh.plotcounter)
-        Mesh.save_state(filename)
+        if rank == 0:
+            print('c', Mesh.plotcounter)
+            print("--- %s seconds ---" % (time.time() - start_time), flush=True)
+            filename = ('output/mesh_%05d.pkl' % Mesh.plotcounter)
+            Mesh.save_state(filename)
 
-        with open('data/last_counter', 'w') as f:
-            f.write(str(Mesh.plotcounter))
+            with open('data/last_counter', 'w') as f:
+                f.write(str(Mesh.plotcounter))
 
-        # save occasionally for resuming
-        if (Mesh.plotcounter % 5)==0:
-            # save last 
-            Mesh.save_state('savedata/Mesh_saved.pkl')
+            # save occasionally for resuming
+            if (Mesh.plotcounter % 5)==0:
+                # save last 
+                Mesh.save_state('savedata/Mesh_saved.pkl')
+
+        start_time = time.time()
 
         Mesh.plotcounter += 1
