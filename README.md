@@ -58,7 +58,9 @@ python3 load_mesh.py
 python3 plot_steps.py
 ```
 
-# MPI
+# Parallel implementation with MPI
+
+Using parallel time integration steps:
 
 - Install 
 
