@@ -1,6 +1,6 @@
 # Balloon with peridynamics
 
-Dynamics of a weather balloon launch using a state-based peridynamic model for thin sheet
+Launch dynamics of a weather balloon using a state-based peridynamic model for thin sheet
 
 # Demonstation
 
