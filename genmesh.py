@@ -245,7 +245,7 @@ class ReturnValue(object):
 
         plt.show()
 
-    def saveplot(self, count, show=False, box_L=None, center_at_mean=True):
+    def saveplot(self, count, show=False, box_L=None, center_at_mean=True, box_boundary=None):
         """TODO: Docstring for plot_full.
 
         :arg1: TODO
@@ -262,7 +262,9 @@ class ReturnValue(object):
             cent = np.array([0, 0, 0])
 
         if box_L:
-            max_L = box_L
+            # if len(box_L) == 1:
+                max_L = box_L
+            # else:
 
         else:
             max_L = np.amax(np.abs(self.CurrPos - cent)) * 1.5
@@ -274,6 +276,15 @@ class ReturnValue(object):
         box_x_max = max_L + cent[0]
         box_y_max = max_L + cent[1]
         box_z_max = max_L + cent[2]
+
+        if box_boundary:
+            box_x_min = box_boundary[0,0] 
+            box_y_min = box_boundary[1,0] 
+            box_z_min = box_boundary[2,0] 
+
+            box_x_max = box_boundary[0,1] 
+            box_y_max = box_boundary[1,1] 
+            box_z_max = box_boundary[2,1] 
 
         # print('dim, cam angle', dim,  camera_angle)
         camera_angle = [0, 0]

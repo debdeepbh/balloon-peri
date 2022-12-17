@@ -12,11 +12,16 @@ if len(argv) == 3:
     lc = int(argv[2])
 
 
+# box_L = None
+# box_L = 300
+box_L = 100
+center_at_mean = True
+# center_at_mean = False
 
 def savefig(count):
     filename = ("output/mesh_%05d.pkl" % count)
     Mesh = pickle.load( open( filename, "rb" ) )
-    Mesh.saveplot(count)
+    Mesh.saveplot(count, box_L=box_L, center_at_mean=center_at_mean)
     
 # parallel formulation
 a_pool = Pool()

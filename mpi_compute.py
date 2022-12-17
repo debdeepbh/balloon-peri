@@ -32,9 +32,12 @@ clamping = False
 attach_weight = True
 attached_weight_mass = 1e2
 cnot_nearest_nbr = 5e2
-# prevent_falling_bottom_node = True
-prevent_falling_bottom_node = False
-initial_shape = 'linear'
+prevent_falling_bottom_node = True
+# prevent_falling_bottom_node = False
+# initial_shape = 'linear'
+initial_shape = 'piecewise_linear'
+
+move_bottom_to_zero = True
 
 
 if resume:
@@ -124,7 +127,8 @@ else:
     # Mesh.b = 500
     # From Frank's code: tauVol = V_d/TargetVolume ;% 0.0125; b_d = 0.084887 % N/m^3 buoyancy = b_d * tauVol  ;
     Mesh.b = 0.104314581941182
-    Mesh.pnot = 1
+    # Mesh.pnot = 1
+    Mesh.pnot = 0
 
     if rank==0:
         print('cnot', cnot)
@@ -217,22 +221,68 @@ else:
 
     if initial_shape == 'linear':
         z = Mesh.pos[:,2]
-        z_min = np.min(z)
-        z_max = np.max(z)
+        z_min = np.amin(z)
+        z_max = np.amax(z)
 
         radial_dist = np.sqrt(np.sum(Mesh.pos[:,0:2]**2, axis=1, keepdims=True))
         radial_dist[radial_dist == 0] = 1
         radial_dir = Mesh.pos[:,0:2] / radial_dist
-        print('rad dir', radial_dir)
         
-        # theta = 0.5
-        # y  = y0 + m(z - z0)
-        # z = z0 => y = 0
+        m = 0.1
+        out_val = np.zeros_like(z)
+        out_val = m * (z - z_min)
+        
+        target_vec = np.zeros_like(Mesh.pos)
+        target_vec[:,0:2] = out_val.reshape((-1,1)) * radial_dir
+        target_vec[:,2] = Mesh.pos[:,2]
 
-        out_val = 0.1 * (z.reshape((-1,1)) - z_min)
+        Mesh.disp = target_vec - Mesh.pos
+
+    elif initial_shape == 'piecewise_linear':
+        z = Mesh.pos[:,2]
+        z_min = np.amin(z)
+        z_max = np.amax(z)
+
+        z_length = z_max - z_min
+
+        radial_dist = np.sqrt(np.sum(Mesh.pos[:,0:2]**2, axis=1, keepdims=True))
+        radial_dist[radial_dist == 0] = 1
+        radial_dir = Mesh.pos[:,0:2] / radial_dist
+        
+        m = 0.1
+        perc = 0.9
+
+        z_m = z_min + perc * z_length
+        ind_a = (z < z_m)
+        ind_b = (z >= z_m)
+
+        out_val = np.zeros_like(z)
+
+        out_val[ind_a] = m * (z[ind_a] - z_min)
+
+        val_m = np.amax(out_val)
+        out_val[ind_b] = val_m +  (val_m/(z_m - z_max)) * (z[ind_b] - z_m)
+
+        if rank ==0:
+            # print('z', z)
+            # print('out_val', out_val)
+            plt.stem(z, out_val)
+            #plt.title(title)
+            #plt.xlabel(xlabel)
+            #plt.ylabel(ylabel)
+            
+            #plt.xlim(float(xx[0]), float(xx[1]))
+            #plt.ylim(float(xx[0]), float(xx[1]))
+            
+            # plt.axis('scaled')
+            plt.grid()
+            plt.show()
+            #plt.savefig(filename, dpi=300, bbox_inches='tight')
+            plt.close()
+        
 
         target_vec = np.zeros_like(Mesh.pos)
-        target_vec[:,0:2] = out_val * radial_dir
+        target_vec[:,0:2] = out_val.reshape((-1,1)) * radial_dir
         target_vec[:,2] = Mesh.pos[:,2]
 
         Mesh.disp = target_vec - Mesh.pos
@@ -249,6 +299,9 @@ else:
     if attach_weight:
         # Mesh.extforce[Mesh.bottom_node, 2] += g_val * attached_weight_mass
         Mesh.extforce[Mesh.bottom_node, 2] += g_val * np.sum(Mesh.mass, keepdims=False)
+
+    if move_bottom_to_zero:
+        Mesh.pos[:,2] -= np.amin(Mesh.pos[:,2])
 
 
 
@@ -609,9 +662,8 @@ for t in range(timesteps):
         #     Mesh.CurrPos[Mesh.bottom_node, 2] = Mesh.pos[Mesh.bottom_node, 2]
 
         if Mesh.disp[Mesh.bottom_node, 2] < 0:
-            print('z-disp of bottom node is negative. Setting it to zero.')
+            # print('z-disp of bottom node is negative. Setting it to zero.')
             Mesh.disp[Mesh.bottom_node, 2] = 0
-
 
 
     #plot
