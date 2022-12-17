@@ -22,7 +22,7 @@ timesteps = 50000
 # resume = True
 resume = False
 
-allow_damping = 0
+allow_damping = 1
 
 # plot properties
 # modulo = 20
@@ -34,10 +34,11 @@ attached_weight_mass = 1e2
 cnot_nearest_nbr = 5e2
 prevent_falling_bottom_node = True
 # prevent_falling_bottom_node = False
-# initial_shape = 'linear'
-initial_shape = 'piecewise_linear'
+initial_shape = 'linear'
+# initial_shape = 'piecewise_linear'
+# initial_shape = 'piecewise_linear_3seg'
 
-move_bottom_to_zero = True
+move_bottom_to_zero = False
 
 
 if resume:
@@ -93,7 +94,8 @@ else:
     Mesh.C1 = 3 * bulk_modulus / Mesh.mx - 15 * shear_modulus / (2 * Mesh.mx)
     Mesh.C2 = 15 * shear_modulus / Mesh.mx
 
-    damping_coeff = 10
+    # damping_coeff = 10
+    damping_coeff = 0.1
 
     # division between 1e8:too stiff and 1e10:too loose
     Mesh.cnot = cnot
@@ -287,6 +289,61 @@ else:
 
         Mesh.disp = target_vec - Mesh.pos
 
+    elif initial_shape == 'piecewise_linear_3seg':
+        z = Mesh.pos[:,2]
+        z_min = np.amin(z)
+        z_max = np.amax(z)
+
+        z_length = z_max - z_min
+
+        radial_dist = np.sqrt(np.sum(Mesh.pos[:,0:2]**2, axis=1, keepdims=True))
+        radial_dist[radial_dist == 0] = 1
+        radial_dir = Mesh.pos[:,0:2] / radial_dist
+        
+        
+        m1 = 0.05
+        m2 = 0.2
+        perc1 = 0.4
+        perc2 = 0.9
+
+        z_m1 = z_min + perc1 * z_length
+        z_m2 = z_min + perc2 * z_length
+
+        ind_a = (z < z_m1)
+        ind_b = (z >= z_m1) & ( z < z_m2)
+        ind_b = (z >= z_m2)
+
+        out_val = np.zeros_like(z)
+
+        out_val[ind_a] = m1 * (z[ind_a] - z_min)
+
+        val_m = np.amax(out_val)
+        out_val[ind_b] = val_m +  (val_m/(z_m - z_max)) * (z[ind_b] - z_m)
+
+        if rank ==0:
+            # print('z', z)
+            # print('out_val', out_val)
+            plt.stem(z, out_val)
+            #plt.title(title)
+            #plt.xlabel(xlabel)
+            #plt.ylabel(ylabel)
+            
+            #plt.xlim(float(xx[0]), float(xx[1]))
+            #plt.ylim(float(xx[0]), float(xx[1]))
+            
+            # plt.axis('scaled')
+            plt.grid()
+            plt.show()
+            #plt.savefig(filename, dpi=300, bbox_inches='tight')
+            plt.close()
+        
+
+        target_vec = np.zeros_like(Mesh.pos)
+        target_vec[:,0:2] = out_val.reshape((-1,1)) * radial_dir
+        target_vec[:,2] = Mesh.pos[:,2]
+
+        Mesh.disp = target_vec - Mesh.pos
+
     # Mesh.extforce = np.c_[
             # np.zeros(total_nodes),
             # np.zeros(total_nodes),
@@ -312,7 +369,7 @@ def get_peridynamic_force_density(Mesh, neighbor_type='peridynamic'):
     """
     force = np.zeros((total_nodes, 3))
 
-    Mesh.strain = []
+    # Mesh.edge_strain = []
 
     # for i in range(total_nodes):
     for i in range(rank, total_nodes, size):    # mpi
@@ -331,13 +388,15 @@ def get_peridynamic_force_density(Mesh, neighbor_type='peridynamic'):
         n_unit_dir = np.array([p/np for p,np in zip(n_etapxi , n_etapxi_norm)])
         n_vol = Mesh.vol[nbrs]
 
-        n_strain_dot = [ np.sum(strain*unit) for strain,unit in zip(n_strain, n_unit_dir)]
-        Mesh.strain.append(n_strain_dot)
+        # n_strain_dot = [ np.sum(strain*unit) for strain,unit in zip(n_strain, n_unit_dir)]
+
 
         if neighbor_type == 'peridynamic':
             cnot_use = Mesh.cnot
         elif neighbor_type == 'nearest_neighbor':
             cnot_use = Mesh.cnot_nearest_nbr
+
+            # Mesh.strain.append(n_strain_dot)
         else:
             print('Wrong bond force type')
 

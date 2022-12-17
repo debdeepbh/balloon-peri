@@ -10,6 +10,9 @@ from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
 # from mpl_toolkits import mplot3d
 
+import matplotlib.colors as matcolors
+import matplotlib.cm as cmx
+
 import meshio
 
 def get_edges(T):
@@ -38,6 +41,7 @@ class ReturnValue(object):
         self.vol = vol
         self.T = T
         self.edges = edges
+        self.strain = None
 
         self.bdry_nodes = bdry_nodes
 
@@ -291,10 +295,12 @@ class ReturnValue(object):
         # camera_angle = [90, 0]
 
         plot_nodes = 0
-        plot_nodes_on_tendon = 1
+        plot_nodes_on_tendon = 0
         dotsize = 0.5
         plot_mesh = 1
         linewidth=0.1
+        alpha = 0.5
+
 
         print(self.plotcounter)
         filename = ('img/tc_%05d.png' % self.plotcounter)
@@ -318,9 +324,38 @@ class ReturnValue(object):
 
             P1 = self.CurrPos[V1]
             P2 = self.CurrPos[V2]
+
+            use_strain = 1
+
+            if use_strain:
+
+                etapxi_norm = np.sqrt(np.sum((P1 - P2)**2, axis=1))
+                xi_norm = np.sqrt(np.sum((self.pos[V1] - self.pos[V2])**2, axis=1))
+                strains = (etapxi_norm - xi_norm) / xi_norm
+                # print('strains', strains)
+                # colors = cmap_fn(strains)
+                alpha = 1
+
+                cmap_fn = plt.get_cmap('viridis')
+                # cNorm  = matcolors.Normalize(vmin=np.min(strains), vmax=np.max(strains))
+                cNorm  = matcolors.Normalize(vmin=0, vmax=1)
+                scalarMap = cmx.ScalarMappable(norm=cNorm, cmap=cmap_fn)
+                colors = scalarMap.to_rgba(strains)
+
+                # print scalarMap.get_clim()
+            else:
+                colors = 'b'
+
+                
+
             ls =  [ [p1, p2] for p1, p2 in zip(P1,P2)] 
-            lc = Line3DCollection(ls, linewidths=linewidth, colors='b')
+            lc = Line3DCollection(ls, linewidths=linewidth, colors=colors, alpha=alpha)
             ax.add_collection(lc)
+
+            if use_strain:
+                axcb = fig.colorbar(lc)
+                axcb.set_label('Strain')
+
 
         # f_norm = np.sqrt(np.sum(self.force**2, axis=0))
         # ax.scatter3D(self.CurrPos[:,0],self.CurrPos[:,1],self.CurrPos[:,2], c=f_norm)
