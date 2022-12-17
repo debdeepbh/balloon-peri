@@ -245,7 +245,7 @@ class ReturnValue(object):
 
         plt.show()
 
-    def saveplot(self, count, show=False):
+    def saveplot(self, count, show=False, box_L=None, center_at_mean=True):
         """TODO: Docstring for plot_full.
 
         :arg1: TODO
@@ -254,7 +254,27 @@ class ReturnValue(object):
         """
 
         # box_L = 1.5
-        box_L = 50 * 1.5
+        # box_L = 50 * 1.5
+
+        if center_at_mean:
+            cent = np.mean(self.CurrPos, axis=0)
+        else:
+            cent = np.array([0, 0, 0])
+
+        if box_L:
+            max_L = box_L
+
+        else:
+            max_L = np.amax(np.abs(self.CurrPos - cent)) * 1.5
+
+        box_x_min = -max_L + cent[0]
+        box_y_min = -max_L + cent[1]
+        box_z_min = -max_L + cent[2]
+
+        box_x_max = max_L + cent[0]
+        box_y_max = max_L + cent[1]
+        box_z_max = max_L + cent[2]
+
         # print('dim, cam angle', dim,  camera_angle)
         camera_angle = [0, 0]
         # camera_angle = [90, 0]
@@ -295,9 +315,9 @@ class ReturnValue(object):
         # ax.scatter3D(self.CurrPos[:,0],self.CurrPos[:,1],self.CurrPos[:,2], c=f_norm)
         # ax.axis('equal')
         ax.view_init(elev = camera_angle[0], azim = camera_angle[1])
-        ax.set_xlim3d(-box_L, box_L)
-        ax.set_ylim3d(-box_L, box_L)
-        ax.set_zlim3d(-box_L, box_L)
+        ax.set_xlim3d(box_x_min, box_x_max)
+        ax.set_ylim3d(box_y_min, box_y_max)
+        ax.set_zlim3d(box_z_min, box_z_max)
         ax.set_box_aspect((1, 1, 1))
         # plt.title("simple 3D scatter plot")
         plt.savefig(filename, dpi=200, bbox_inches='tight')
@@ -351,7 +371,7 @@ def genmesh(P_bdry, meshsize, pygmsh_geom=None, msh_file = None, dimension = 2, 
     if dimension==1:
         T = mesh.get_cells_type("line")
     elif dimension==2:
-        T = mesh.get_cells_type("3riangle")
+        T = mesh.get_cells_type("triangle")
     elif dimension == 3:
         # T = mesh.get_cells_type("tetra")
         T = mesh.get_cells_type("triangle")

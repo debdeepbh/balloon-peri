@@ -14,7 +14,8 @@ print('rank', rank, flush=True)
 
 # dt = 2e-3
 # dt = 1e-1
-dt = 1e-4
+# dt = 1e-4 # works with peri
+dt = 2e-3
 timesteps = 50000
 # timesteps = 1
 
@@ -27,6 +28,13 @@ allow_damping = 0
 # modulo = 20
 modulo = 100
 
+clamping = False
+attach_weight = True
+attached_weight_mass = 1e2
+cnot_nearest_nbr = 5e2
+# prevent_falling_bottom_node = True
+prevent_falling_bottom_node = False
+initial_shape = 'linear'
 
 
 if resume:
@@ -50,9 +58,11 @@ else:
     # z-value of the bottom of the balloon
     z_0 = Mesh.pos[Mesh.bottom_node,2]
 
-    # nodes to clamp
-    # clamped_nodes = []
-    Mesh.clamped_nodes = [Mesh.bottom_node]
+    if clamping:
+        # nodes to clamp
+        # clamped_nodes = []
+        Mesh.clamped_nodes = [Mesh.bottom_node]
+
 
     # Material properties
 
@@ -84,6 +94,9 @@ else:
 
     # division between 1e8:too stiff and 1e10:too loose
     Mesh.cnot = cnot
+
+    Mesh.cnot_nearest_nbr = cnot_nearest_nbr
+
     # Mesh.cnot = cnot /1e3
 
     # Mesh.rho = 920 # LDPE 920 kg/m^3
@@ -202,6 +215,28 @@ else:
     # Mesh.extforce += [0, 0, 0]
     ## gravity (not density anymore)
 
+    if initial_shape == 'linear':
+        z = Mesh.pos[:,2]
+        z_min = np.min(z)
+        z_max = np.max(z)
+
+        radial_dist = np.sqrt(np.sum(Mesh.pos[:,0:2]**2, axis=1, keepdims=True))
+        radial_dist[radial_dist == 0] = 1
+        radial_dir = Mesh.pos[:,0:2] / radial_dist
+        print('rad dir', radial_dir)
+        
+        # theta = 0.5
+        # y  = y0 + m(z - z0)
+        # z = z0 => y = 0
+
+        out_val = 0.1 * (z.reshape((-1,1)) - z_min)
+
+        target_vec = np.zeros_like(Mesh.pos)
+        target_vec[:,0:2] = out_val * radial_dir
+        target_vec[:,2] = Mesh.pos[:,2]
+
+        Mesh.disp = target_vec - Mesh.pos
+
     # Mesh.extforce = np.c_[
             # np.zeros(total_nodes),
             # np.zeros(total_nodes),
@@ -211,13 +246,20 @@ else:
     for i in range(rank, total_nodes, size):    # mpi
         Mesh.extforce[i,2] = g_val * Mesh.mass[i]
 
+    if attach_weight:
+        # Mesh.extforce[Mesh.bottom_node, 2] += g_val * attached_weight_mass
+        Mesh.extforce[Mesh.bottom_node, 2] += g_val * np.sum(Mesh.mass, keepdims=False)
 
-def get_peridynamic_force_density(Mesh):
+
+
+def get_peridynamic_force_density(Mesh, neighbor_type='peridynamic'):
     """Compute the peridynamic force density
     :Mesh: TODO
     :returns: TODO
     """
     force = np.zeros((total_nodes, 3))
+
+    Mesh.strain = []
 
     # for i in range(total_nodes):
     for i in range(rank, total_nodes, size):    # mpi
@@ -235,7 +277,18 @@ def get_peridynamic_force_density(Mesh):
         # n_unit_dir = n_etapxi / n_etapxi_norm
         n_unit_dir = np.array([p/np for p,np in zip(n_etapxi , n_etapxi_norm)])
         n_vol = Mesh.vol[nbrs]
-        nsum_force = np.sum(Mesh.cnot * n_strain * n_unit_dir * n_vol, axis=0)
+
+        n_strain_dot = [ np.sum(strain*unit) for strain,unit in zip(n_strain, n_unit_dir)]
+        Mesh.strain.append(n_strain_dot)
+
+        if neighbor_type == 'peridynamic':
+            cnot_use = Mesh.cnot
+        elif neighbor_type == 'nearest_neighbor':
+            cnot_use = Mesh.cnot_nearest_nbr
+        else:
+            print('Wrong bond force type')
+
+        nsum_force = np.sum(cnot_use * n_strain * n_unit_dir * n_vol, axis=0)
 
         # return nsum_force
         force[i,:] = nsum_force
@@ -245,6 +298,8 @@ def get_peridynamic_force_density(Mesh):
     # force = a_pool.map(one_row, range(total_nodes)) 
     # force = np.array(force)
     # print(force)
+
+    # save for plotting
 
     return force
 
@@ -483,12 +538,20 @@ for t in range(timesteps):
 
     Mesh.force =  np.zeros((total_nodes,3))
 
-    Mesh.force += (get_state_based_peridynamic_force_density(Mesh) * Mesh.vol)
+    # Mesh.force += (get_state_based_peridynamic_force_density(Mesh) * Mesh.vol)
     # Mesh.force += (get_peridynamic_force_density(Mesh) * Mesh.vol)
-    Mesh.force += (get_peridynamic_force_density_tendon(Mesh) * Mesh.len_t)
+
+    # print('computing peri force', flush=True)
+    Mesh.force += (get_peridynamic_force_density(Mesh, neighbor_type='nearest_neighbor') * Mesh.vol)
+
+    # Mesh.force += (get_peridynamic_force_density_tendon(Mesh) * Mesh.len_t)
+
+    # print('computing pressure', flush=True)
     Mesh.force += get_pressure(Mesh).pforce
+    # print('computing extforce', flush=True)
     Mesh.force += Mesh.extforce
     if Mesh.allow_damping:
+        # print('computing damping', flush=True)
         Mesh.force -= Mesh.damping_coeff * Mesh.vel
 
     ## Caution: Error exists here (also takes longer. Why??)
@@ -509,6 +572,7 @@ for t in range(timesteps):
         # if Mesh.allow_damping:
             # Mesh.force[i] -= Mesh.damping_coeff * Mesh.vel[i]
 
+    # print('reducing', flush=True)
     comm.Allreduce(MPI.IN_PLACE, Mesh.force, op=MPI.SUM)
 
     ## acceleration from force density
@@ -536,6 +600,20 @@ for t in range(timesteps):
         Mesh.vel[cnode] = [0, 0, 0]
         Mesh.acc[cnode] = [0, 0, 0]
 
+    # clamped node
+    if prevent_falling_bottom_node:
+        # if Mesh.CurrPos[Mesh.bottom_node, 2] < Mesh.pos[Mesh.bottom_node, 2]:
+        #     Mesh.disp[Mesh.bottom_node, 2] = 0
+        #     Mesh.vel[Mesh.bottom_node, 2] = 0
+        #     Mesh.acc[Mesh.bottom_node, 2] = 0
+        #     Mesh.CurrPos[Mesh.bottom_node, 2] = Mesh.pos[Mesh.bottom_node, 2]
+
+        if Mesh.disp[Mesh.bottom_node, 2] < 0:
+            print('z-disp of bottom node is negative. Setting it to zero.')
+            Mesh.disp[Mesh.bottom_node, 2] = 0
+
+
+
     #plot
     if (t % modulo)==0:
         if rank == 0:
@@ -543,6 +621,8 @@ for t in range(timesteps):
             print("--- %s seconds ---" % (time.time() - start_time), flush=True)
             filename = ('output/mesh_%05d.pkl' % Mesh.plotcounter)
             Mesh.save_state(filename)
+
+            print('Bottom node z-loc:', Mesh.CurrPos[Mesh.bottom_node,2])
 
             with open('data/last_counter', 'w') as f:
                 f.write(str(Mesh.plotcounter))

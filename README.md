@@ -28,29 +28,37 @@ pip3 install -r requirements.txt
 - Generate the surface mesh (set meshsize etc within the file) with
 
 Full-size (150 m as half-diameter):
+
 ```
-gmsh mesh/3d_sphere_forloop_big.geo -2 
+gmsh mesh/3d_sphere_forloop_big.geo -3 
 ```
 
 **Unit sphere** with tendons on vertical planes 
+
 ```
-gmsh mesh/3d_sphere_forloop.geo -2
+gmsh mesh/3d_sphere_forloop.geo -3
 ```
 
 Old (don't use):
+
 ```
-gmsh mesh/3d_sphere_unit.geo -2
+gmsh mesh/3d_sphere_unit.geo -3
 ```
+
 (`mesh/3d_sphere_forloop.geo` has nodes on the tendons)
 
-- Generate neighborhood array (set `msh` file name, `ngores`, and peridynamic horizon size `delta` here)
+- Generate neighborhood array (set `msh` file name, `ngores`, and peridynamic horizon size `delta` here. Alternatively, set `neighbor_type = 'nearest_neighbor'` to use mesh edge information as the neighborhood information.)
+
 ```
 python3 gen_nbdarr.py
 ```
+
 * Load the mesh and simulate (and set parameters) with 
+
 ```
 python3 load_mesh.py
 ```
+
 - Resuming is possible by setting `resume = True` in `load_mesh.py` and running `python3 load_mesh.py` again.
 
 - Convert saved files into images using

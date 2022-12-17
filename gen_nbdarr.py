@@ -20,13 +20,14 @@ rad = 48
 # msh_file='mesh/3d_sphere_forloop.msh'
 msh_file='mesh/3d_sphere_forloop_big.msh'
 
+neighbor_type = 'nearest_neighbor'
+# neighbor_type = 'peridynamic'
+
 # delta = 0.7
 h = 0.3
 delta = h * rad
-plot_bonds = 0
+plot_bonds = True
 
-# Mesh = genmesh(P_bdry=None, meshsize=None,  msh_file=msh_file , do_plot = True, dotsize = 10, mesh_optimize=True )
-# def genmesh(P_bdry, meshsize, pygmsh_geom=None, msh_file = None, do_plot = True, dimension = 2, dotsize = 10, mesh_optimize=True):
 Mesh =  genmesh(P_bdry=None, meshsize=None, pygmsh_geom=None, msh_file=msh_file, dimension=3, mesh_optimize=True)
 
 # store data in mesh
@@ -63,33 +64,34 @@ def oneparam_f_bond(ij):
     return single_bond(Mesh,ij)
 
 # gores and nodes on tendon
-Mesh.gen_nodes_on_tendon()
-
-print('Generating pairwise reference distance and connectivity.')
-## parallel attempt
-a_pool = Pool()
-all_bonds = a_pool.map(oneparam_f_bond, pairs) 
-# remove all None
-clean = np.array([i for i in all_bonds if i is not None])
-
-Mesh.Conn = clean[:, 0:2].astype(int)
-Mesh.Conn_xi_norm = clean[:, 2]
-
-print('Conn', Mesh.Conn)
-print('Conn_xi_norm', Mesh.Conn_xi_norm)
-
-# gores and nodes on tendon
 Mesh.ngores = ngores
 Mesh.gen_nodes_on_tendon()
 
+print('Generating pairwise reference distance and connectivity.')
 
+if neighbor_type == 'peridynamic':
+    ## parallel attempt
+    a_pool = Pool()
+    all_bonds = a_pool.map(oneparam_f_bond, pairs) 
+    # remove all None
+    clean = np.array([i for i in all_bonds if i is not None])
+
+    Mesh.Conn = clean[:, 0:2].astype(int)
+    Mesh.Conn_xi_norm = clean[:, 2]
+
+elif neighbor_type == 'nearest_neighbor':
+    Mesh.Conn = Mesh.edges 
+    Mesh.Conn_xi_norm = np.sqrt(np.sum((Mesh.pos[Mesh.Conn[:,1]] - Mesh.pos[Mesh.Conn[:,0]])**2, axis=1, keepdims=False))
+
+print('Conn', Mesh.Conn)
+print('Conn_xi_norm', Mesh.Conn_xi_norm)
 
 
 # save the mesh
 # np.save('data/Mesh.npy', Mesh, allow_pickle=True)
 
 if plot_bonds:
-    linewidth =1
+    linewidth = 1
     print('Plotting bonds')
 
     fig = plt.figure()
@@ -97,24 +99,27 @@ if plot_bonds:
 
     Pos = Mesh.pos
 
-    V1 = Conn[:,0]
-    V2 = Conn[:,1]
+
+    ax.scatter(Pos[:,0], Pos[:,1], Pos[:,2])
+
+    V1 = Mesh.Conn[:,0]
+    V2 = Mesh.Conn[:,1]
 
     P1 = Pos[V1]
     P2 = Pos[V2]
     ls =  [ [p1, p2] for p1, p2 in zip(P1,P2)] 
-    lc = Line3DCollection(ls, linewidths=linewidth, colors='b')
+    lc = Line3DCollection(ls, linewidths=linewidth, colors='b', alpha=0.5)
     ax.add_collection(lc)
 
-    # fix the axes
-    extents = np.array([getattr(ax, 'get_{}lim'.format(dim))() for dim in 'xyz'])
-    sz = extents[:,1] - extents[:,0]
-    centers = np.mean(extents, axis=1)
-    maxsize = max(abs(sz))
-    r = maxsize/2
-    for ctr, direc in zip(centers, 'xyz'):
-        getattr(ax, 'set_{}lim'.format(direc))(ctr - r, ctr + r)
+    mx = np.amax(np.abs(Pos))
+    XYZlim = [-mx, mx]
+    ax.set_xlim3d(XYZlim)
+    ax.set_ylim3d(XYZlim)
+    ax.set_zlim3d(XYZlim)
+    ax.set_box_aspect((1, 1, 1))
+
     plt.show()
+
 
 
 # save
